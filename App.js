@@ -1,43 +1,47 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { StatusBar } from 'react-native';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import OnboardingNavigator from './src/navigation/OnboardingNavigator';
+import TabNavigator from './src/navigation/TabNavigator';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
+
+function AppContent() {
+  const { isAuthenticated, hasCompletedOnboarding, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#55786f" />
+      </View>
+    );
+  }
+
+  // Show onboarding if not authenticated or hasn't completed onboarding
+  if (!isAuthenticated || !hasCompletedOnboarding) {
+    return <OnboardingNavigator />;
+  }
+
+  // Show main app if authenticated and completed onboarding
+  return <TabNavigator />;
+}
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🌞 WakeyTalky</Text>
-      <Text style={styles.subtitle}>Your smart alarm app is running!</Text>
-      <Text style={styles.description}>
-        This is the basic setup. The full app with AI voice generation, 
-        personalized alarms, and beautiful UI is ready to be built!
-      </Text>
-    </View>
+    <AuthProvider>
+      <NavigationContainer>
+        <StatusBar barStyle="light-content" backgroundColor="#55786f" />
+        <AppContent />
+      </NavigationContainer>
+    </AuthProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loadingContainer: {
     flex: 1,
-    backgroundColor: '#fdf6ec',
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#55786f',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#e07a5f',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  description: {
-    fontSize: 16,
-    color: '#9e9e9e',
-    textAlign: 'center',
-    lineHeight: 24,
+    alignItems: 'center',
+    backgroundColor: '#fdf6ec',
   },
 }); 

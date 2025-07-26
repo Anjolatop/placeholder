@@ -1,459 +1,344 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useApp } from '../context/AppContext';
-import { COLORS, THEME } from '../constants/theme';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, StatusBar, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
-const { width } = Dimensions.get('window');
-
-const HomeScreen = ({ navigation }) => {
-  const { state, actions } = useApp();
+export default function HomeScreen() {
+  const { userProfile, signOut } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [nextAlarm, setNextAlarm] = useState(null);
 
   useEffect(() => {
+    // Update time every second
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
 
+    // Cleanup timer on component unmount
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    calculateNextAlarm();
-  }, [state.alarms]);
+  const formatTime = (date) => {
+    return date.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
 
-  const calculateNextAlarm = () => {
-    if (!state.alarms || state.alarms.length === 0) {
-      setNextAlarm(null);
-      return;
-    }
+  const formatDate = (date) => {
+    return date.toLocaleDateString([], { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
 
-    const now = new Date();
-    const today = now.getDay();
-    const currentTimeString = now.toTimeString().slice(0, 5);
-
-    // Find the next alarm for today
-    const todayAlarms = state.alarms.filter(alarm => 
-      alarm.isActive && alarm.days.includes(today) && alarm.time > currentTimeString
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: signOut }
+      ]
     );
-
-    if (todayAlarms.length > 0) {
-      // Sort by time and get the earliest
-      const sortedAlarms = todayAlarms.sort((a, b) => a.time.localeCompare(b.time));
-      setNextAlarm(sortedAlarms[0]);
-    } else {
-      // Find the next alarm for future days
-      const futureAlarms = state.alarms.filter(alarm => alarm.isActive);
-      if (futureAlarms.length > 0) {
-        // For simplicity, just get the first active alarm
-        setNextAlarm(futureAlarms[0]);
-      } else {
-        setNextAlarm(null);
-      }
-    }
   };
 
-  const formatTime = (timeString) => {
-    const [hours, minutes] = timeString.split(':');
-    const date = new Date();
-    date.setHours(parseInt(hours), parseInt(minutes), 0);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const getGreeting = () => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    if (hour < 21) return 'Good Evening';
-    return 'Good Night';
-  };
-
-  const getMotivationalQuote = () => {
-    const quotes = [
-      "Every morning is a new beginning. Make it count!",
-      "Your future self is watching you right now through memories.",
-      "The only bad workout is the one that didn't happen.",
-      "Wake up with determination. Go to bed with satisfaction.",
-      "Your body can stand almost anything. It's your mind you have to convince.",
-      "The difference between try and triumph is just a little umph!",
-      "Don't wish for it. Work for it.",
-      "Make yourself proud.",
-      "Today's goal: Outdo yesterday.",
-      "Small progress is still progress.",
-    ];
-    return quotes[Math.floor(Math.random() * quotes.length)];
-  };
-
-  const getDayName = (dayNumber) => {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[dayNumber];
-  };
-
-  const getTimeUntilAlarm = (alarmTime) => {
-    const now = new Date();
-    const [hours, minutes] = alarmTime.split(':');
-    const alarmDate = new Date();
-    alarmDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-    
-    if (alarmDate <= now) {
-      alarmDate.setDate(alarmDate.getDate() + 1);
-    }
-    
-    const diff = alarmDate - now;
-    const hoursDiff = Math.floor(diff / (1000 * 60 * 60));
-    const minutesDiff = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hoursDiff > 0) {
-      return `${hoursDiff}h ${minutesDiff}m`;
-    }
-    return `${minutesDiff}m`;
+  const getUserName = () => {
+    return userProfile?.name || 'User';
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={[COLORS.softLilac, COLORS.creamBeige]}
-        style={styles.gradient}
-      >
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>{getGreeting()}</Text>
-              <Text style={styles.userName}>
-                {state.user?.name || 'Friend'}! 👋
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.profileButton}
-              onPress={() => navigation.navigate('Profile')}
-            >
-              <Icon name="person" size={24} color={COLORS.forestGreen} />
-            </TouchableOpacity>
-          </View>
+    <ScrollView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#55786f" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>🌞 WakeyTalky</Text>
+          <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.subtitle}>Good morning, {getUserName()}!</Text>
+      </View>
 
-          {/* Current Time */}
-          <View style={styles.timeContainer}>
-            <Text style={styles.currentTime}>
-              {currentTime.toLocaleTimeString([], { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit'
-              })}
+      {/* Current Time */}
+      <View style={styles.timeCard}>
+        <Text style={styles.timeLabel}>Current Time</Text>
+        <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+        <Text style={styles.dateText}>{formatDate(currentTime)}</Text>
+      </View>
+
+      {/* Next Alarm */}
+      <View style={styles.alarmCard}>
+        <Text style={styles.cardTitle}>⏰ Next Alarm</Text>
+        <Text style={styles.alarmTime}>7:00 AM</Text>
+        <Text style={styles.alarmLabel}>Gym Session</Text>
+        <Text style={styles.alarmStatus}>Tomorrow</Text>
+      </View>
+
+      {/* Wake Streak */}
+      <View style={styles.streakCard}>
+        <Text style={styles.cardTitle}>🔥 Wake Streak</Text>
+        <Text style={styles.streakNumber}>5 days</Text>
+        <Text style={styles.streakText}>Keep it up! You're doing great!</Text>
+      </View>
+
+      {/* User Preferences Summary */}
+      <View style={styles.preferencesCard}>
+        <Text style={styles.cardTitle}>🎭 Your Preferences</Text>
+        <View style={styles.preferenceItem}>
+          <Text style={styles.preferenceLabel}>Tone:</Text>
+          <Text style={styles.preferenceValue}>
+            {userProfile?.preferredTone?.replace('-', ' ').toUpperCase() || 'Mid-Delicate'}
+          </Text>
+        </View>
+        <View style={styles.preferenceItem}>
+          <Text style={styles.preferenceLabel}>Wake Style:</Text>
+          <Text style={styles.preferenceValue}>
+            {userProfile?.wakeStylePreference?.toUpperCase() || 'Mixed'}
+          </Text>
+        </View>
+        {userProfile?.hobbies?.length > 0 && (
+          <View style={styles.preferenceItem}>
+            <Text style={styles.preferenceLabel}>Hobbies:</Text>
+            <Text style={styles.preferenceValue}>
+              {userProfile.hobbies.slice(0, 2).join(', ')}
+              {userProfile.hobbies.length > 2 && '...'}
             </Text>
-            <Text style={styles.currentDate}>
-              {currentTime.toLocaleDateString([], { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </Text>
           </View>
+        )}
+      </View>
 
-          {/* Next Alarm Card */}
-          {nextAlarm ? (
-            <View style={styles.alarmCard}>
-              <View style={styles.alarmHeader}>
-                <Icon name="alarm" size={24} color={COLORS.accentBurntOrange} />
-                <Text style={styles.alarmTitle}>Next Alarm</Text>
-              </View>
-              <Text style={styles.alarmTime}>{formatTime(nextAlarm.time)}</Text>
-              <Text style={styles.alarmLabel}>{nextAlarm.label}</Text>
-              <Text style={styles.alarmPurpose}>{nextAlarm.purpose}</Text>
-              <View style={styles.alarmFooter}>
-                <Text style={styles.timeUntil}>
-                  In {getTimeUntilAlarm(nextAlarm.time)}
-                </Text>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => navigation.navigate('AlarmSetup', { alarmId: nextAlarm.id })}
-                >
-                  <Icon name="edit" size={16} color={COLORS.gray} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.noAlarmCard}>
-              <Icon name="alarm-off" size={48} color={COLORS.gray} />
-              <Text style={styles.noAlarmTitle}>No alarms set</Text>
-              <Text style={styles.noAlarmSubtitle}>
-                Set your first alarm to get started!
-              </Text>
-              <TouchableOpacity
-                style={styles.addAlarmButton}
-                onPress={() => navigation.navigate('AlarmSetup')}
-              >
-                <Text style={styles.addAlarmButtonText}>Add Alarm</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+      {/* Motivational Quote */}
+      <View style={styles.quoteCard}>
+        <Text style={styles.quoteText}>
+          "The early bird catches the worm, but the early riser catches their dreams."
+        </Text>
+        <Text style={styles.quoteAuthor}>- WakeyTalky</Text>
+      </View>
 
-          {/* Stats Cards */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Icon name="local-fire-department" size={32} color={COLORS.accentBurntOrange} />
-              <Text style={styles.statNumber}>
-                {state.userStats?.currentStreak || 0}
-              </Text>
-              <Text style={styles.statLabel}>Day Streak</Text>
-            </View>
-            
-            <View style={styles.statCard}>
-              <Icon name="check-circle" size={32} color={COLORS.forestGreen} />
-              <Text style={styles.statNumber}>
-                {state.userStats?.successfulWakes || 0}
-              </Text>
-              <Text style={styles.statLabel}>Successful Wakes</Text>
-            </View>
-            
-            <View style={styles.statCard}>
-              <Icon name="trending-up" size={32} color={COLORS.dustyBlue} />
-              <Text style={styles.statNumber}>
-                {state.userStats?.level || 1}
-              </Text>
-              <Text style={styles.statLabel}>Level</Text>
-            </View>
+      {/* Quick Actions */}
+      <View style={styles.actionsCard}>
+        <Text style={styles.cardTitle}>Quick Actions</Text>
+        <View style={styles.actionButtons}>
+          <View style={styles.actionButton}>
+            <Text style={styles.actionIcon}>⏰</Text>
+            <Text style={styles.actionText}>Set Alarm</Text>
           </View>
-
-          {/* Motivational Quote */}
-          <View style={styles.quoteCard}>
-            <Icon name="format-quote" size={24} color={COLORS.accentBurntOrange} />
-            <Text style={styles.quoteText}>{getMotivationalQuote()}</Text>
+          <View style={styles.actionButton}>
+            <Text style={styles.actionIcon}>🎵</Text>
+            <Text style={styles.actionText}>Voice Test</Text>
           </View>
-
-          {/* Quick Actions */}
-          <View style={styles.quickActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('AlarmSetup')}
-            >
-              <Icon name="add-alarm" size={24} color={COLORS.white} />
-              <Text style={styles.actionButtonText}>New Alarm</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Stats')}
-            >
-              <Icon name="bar-chart" size={24} color={COLORS.white} />
-              <Text style={styles.actionButtonText}>View Stats</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Voice')}
-            >
-              <Icon name="mic" size={24} color={COLORS.white} />
-              <Text style={styles.actionButtonText}>Voice Test</Text>
-            </TouchableOpacity>
+          <View style={styles.actionButton}>
+            <Text style={styles.actionIcon}>📊</Text>
+            <Text style={styles.actionText}>Stats</Text>
           </View>
-        </ScrollView>
-      </LinearGradient>
-    </SafeAreaView>
+        </View>
+      </View>
+    </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: THEME.spacing.lg,
+    backgroundColor: '#fdf6ec',
   },
   header: {
+    backgroundColor: '#55786f',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: THEME.spacing.lg,
+    marginBottom: 10,
   },
-  greeting: {
-    fontSize: THEME.typography.fontSize.lg,
-    color: COLORS.gray,
-  },
-  userName: {
-    fontSize: THEME.typography.fontSize['2xl'],
+  title: {
+    fontSize: 28,
     fontWeight: 'bold',
-    color: COLORS.forestGreen,
+    color: '#ffffff',
   },
-  profileButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
+  signOutButton: {
+    padding: 8,
+  },
+  signOutText: {
+    color: '#f2d1d1',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#f2d1d1',
+  },
+  timeCard: {
+    backgroundColor: '#ffffff',
+    margin: 15,
+    padding: 20,
+    borderRadius: 15,
     alignItems: 'center',
-    ...THEME.shadows.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  timeContainer: {
-    alignItems: 'center',
-    marginBottom: THEME.spacing.xl,
+  timeLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
   },
-  currentTime: {
-    fontSize: THEME.typography.fontSize['4xl'],
+  timeText: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: COLORS.forestGreen,
-    fontFamily: 'monospace',
+    color: '#55786f',
+    marginBottom: 5,
   },
-  currentDate: {
-    fontSize: THEME.typography.fontSize.lg,
-    color: COLORS.gray,
-    marginTop: THEME.spacing.xs,
+  dateText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
   alarmCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: THEME.borderRadius.lg,
-    padding: THEME.spacing.lg,
-    marginBottom: THEME.spacing.lg,
-    ...THEME.shadows.md,
+    backgroundColor: '#ffffff',
+    margin: 15,
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  alarmHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: THEME.spacing.md,
-  },
-  alarmTitle: {
-    fontSize: THEME.typography.fontSize.lg,
+  cardTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.forestGreen,
-    marginLeft: THEME.spacing.sm,
+    color: '#55786f',
+    marginBottom: 10,
   },
   alarmTime: {
-    fontSize: THEME.typography.fontSize['3xl'],
+    fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.accentBurntOrange,
-    marginBottom: THEME.spacing.sm,
+    color: '#e07a5f',
+    marginBottom: 5,
   },
   alarmLabel: {
-    fontSize: THEME.typography.fontSize.lg,
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 5,
+  },
+  alarmStatus: {
+    fontSize: 14,
+    color: '#666',
+  },
+  streakCard: {
+    backgroundColor: '#ffffff',
+    margin: 15,
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  streakNumber: {
+    fontSize: 36,
     fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: THEME.spacing.xs,
+    color: '#e07a5f',
+    marginBottom: 10,
   },
-  alarmPurpose: {
-    fontSize: THEME.typography.fontSize.base,
-    color: COLORS.gray,
-    marginBottom: THEME.spacing.md,
+  streakText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
-  alarmFooter: {
+  preferencesCard: {
+    backgroundColor: '#ffffff',
+    margin: 15,
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  preferenceItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  timeUntil: {
-    fontSize: THEME.typography.fontSize.sm,
-    color: COLORS.gray,
+  preferenceLabel: {
+    fontSize: 14,
+    color: '#666',
   },
-  editButton: {
-    padding: THEME.spacing.xs,
-  },
-  noAlarmCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: THEME.borderRadius.lg,
-    padding: THEME.spacing.xl,
-    marginBottom: THEME.spacing.lg,
-    alignItems: 'center',
-    ...THEME.shadows.md,
-  },
-  noAlarmTitle: {
-    fontSize: THEME.typography.fontSize.xl,
+  preferenceValue: {
+    fontSize: 14,
+    color: '#55786f',
     fontWeight: 'bold',
-    color: COLORS.forestGreen,
-    marginTop: THEME.spacing.md,
-    marginBottom: THEME.spacing.sm,
-  },
-  noAlarmSubtitle: {
-    fontSize: THEME.typography.fontSize.base,
-    color: COLORS.gray,
-    textAlign: 'center',
-    marginBottom: THEME.spacing.lg,
-  },
-  addAlarmButton: {
-    backgroundColor: COLORS.accentBurntOrange,
-    borderRadius: THEME.borderRadius.lg,
-    paddingHorizontal: THEME.spacing.lg,
-    paddingVertical: THEME.spacing.md,
-  },
-  addAlarmButtonText: {
-    fontSize: THEME.typography.fontSize.lg,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: THEME.spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: THEME.borderRadius.lg,
-    padding: THEME.spacing.md,
-    alignItems: 'center',
-    marginHorizontal: THEME.spacing.xs,
-    ...THEME.shadows.sm,
-  },
-  statNumber: {
-    fontSize: THEME.typography.fontSize['2xl'],
-    fontWeight: 'bold',
-    color: COLORS.forestGreen,
-    marginTop: THEME.spacing.xs,
-  },
-  statLabel: {
-    fontSize: THEME.typography.fontSize.sm,
-    color: COLORS.gray,
-    textAlign: 'center',
-    marginTop: THEME.spacing.xs,
   },
   quoteCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: THEME.borderRadius.lg,
-    padding: THEME.spacing.lg,
-    marginBottom: THEME.spacing.lg,
-    ...THEME.shadows.sm,
+    backgroundColor: '#d8c5f3',
+    margin: 15,
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   quoteText: {
-    fontSize: THEME.typography.fontSize.lg,
-    color: COLORS.forestGreen,
+    fontSize: 16,
+    color: '#333',
     fontStyle: 'italic',
     textAlign: 'center',
-    marginTop: THEME.spacing.sm,
-    lineHeight: THEME.typography.lineHeight.relaxed,
+    marginBottom: 10,
   },
-  quickActions: {
+  quoteAuthor: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  actionsCard: {
+    backgroundColor: '#ffffff',
+    margin: 15,
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: THEME.spacing.xl,
+    justifyContent: 'space-around',
+    marginTop: 15,
   },
   actionButton: {
-    flex: 1,
-    backgroundColor: COLORS.accentBurntOrange,
-    borderRadius: THEME.borderRadius.lg,
-    paddingVertical: THEME.spacing.md,
     alignItems: 'center',
-    marginHorizontal: THEME.spacing.xs,
-    ...THEME.shadows.sm,
+    padding: 15,
+    backgroundColor: '#f2d1d1',
+    borderRadius: 10,
+    minWidth: 80,
   },
-  actionButtonText: {
-    fontSize: THEME.typography.fontSize.sm,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginTop: THEME.spacing.xs,
+  actionIcon: {
+    fontSize: 24,
+    marginBottom: 5,
   },
-});
-
-export default HomeScreen; 
+  actionText: {
+    fontSize: 12,
+    color: '#333',
+    textAlign: 'center',
+  },
+}); 
