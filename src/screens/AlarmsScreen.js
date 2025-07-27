@@ -13,7 +13,12 @@ export default function AlarmsScreen() {
       scale: new Animated.Value(1),
       morningGoal: 'stretching',
       aiVoiceEnabled: true,
-      ringCount: 0
+      ringCount: 0,
+      tasks: [
+        { id: 1, type: 'steps', title: 'Walk 100 steps', completed: false, target: 100, current: 0 },
+        { id: 2, type: 'photo', title: 'Take photo of coffee making', completed: false, description: 'Capture yourself making coffee' }
+      ],
+      taskRequiredAfterSnoozes: 2
     },
     {
       id: 2,
@@ -24,7 +29,12 @@ export default function AlarmsScreen() {
       scale: new Animated.Value(1),
       morningGoal: 'studying',
       aiVoiceEnabled: true,
-      ringCount: 0
+      ringCount: 0,
+      tasks: [
+        { id: 1, type: 'math', title: 'Solve 3 math problems', completed: false, target: 3, current: 0 },
+        { id: 2, type: 'photo', title: 'Take photo of workspace', completed: false, description: 'Show your organized workspace' }
+      ],
+      taskRequiredAfterSnoozes: 1
     },
     {
       id: 3,
@@ -35,7 +45,12 @@ export default function AlarmsScreen() {
       scale: new Animated.Value(1),
       morningGoal: 'running',
       aiVoiceEnabled: true,
-      ringCount: 0
+      ringCount: 0,
+      tasks: [
+        { id: 1, type: 'steps', title: 'Walk 200 steps', completed: false, target: 200, current: 0 },
+        { id: 2, type: 'water', title: 'Drink 2 glasses of water', completed: false, target: 2, current: 0 }
+      ],
+      taskRequiredAfterSnoozes: 2
     }
   ]);
 
@@ -49,14 +64,24 @@ export default function AlarmsScreen() {
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showTaskConfigModal, setShowTaskConfigModal] = useState(false);
+  const [selectedTaskType, setSelectedTaskType] = useState(null);
   const [editingAlarm, setEditingAlarm] = useState(null);
   const [newAlarm, setNewAlarm] = useState({
     time: '7:00 AM',
     label: '',
     days: 'Mon - Fri',
     morningGoal: 'stretching',
-    aiVoiceEnabled: true
+    aiVoiceEnabled: true,
+    tasks: [],
+    taskRequiredAfterSnoozes: 2
   });
+
+  // Task completion modal states
+  const [currentTaskAlarm, setCurrentTaskAlarm] = useState(null);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
+  const [taskProgress, setTaskProgress] = useState({});
 
   // Quick settings modal states
   const [showSnoozeModal, setShowSnoozeModal] = useState(false);
@@ -89,6 +114,18 @@ export default function AlarmsScreen() {
     { id: 'cooking', label: 'Cooking', icon: '👨‍🍳', desc: 'Healthy breakfast prep' },
     { id: 'reading', label: 'Reading', icon: '📖', desc: 'Personal development' },
     { id: 'planning', label: 'Planning', icon: '📝', desc: 'Day organization' }
+  ];
+
+  // Available tasks for selection
+  const availableTasks = [
+    { id: 'steps', title: 'Walk Steps', icon: '👟', desc: 'Complete step count to wake up', types: [100, 200, 500, 1000] },
+    { id: 'math', title: 'Math Problems', icon: '🧮', desc: 'Solve math problems to activate brain', types: [3, 5, 10] },
+    { id: 'photo', title: 'Take Photo', icon: '📸', desc: 'Capture specific activity as proof', types: ['coffee', 'workspace', 'exercise', 'breakfast'] },
+    { id: 'water', title: 'Drink Water', icon: '💧', desc: 'Hydrate yourself to start the day', types: [1, 2, 3] },
+    { id: 'pushups', title: 'Push-ups', icon: '💪', desc: 'Complete push-ups to get moving', types: [5, 10, 20] },
+    { id: 'squats', title: 'Squats', icon: '🦵', desc: 'Complete squats to energize', types: [10, 20, 30] },
+    { id: 'reading', title: 'Read Pages', icon: '📖', desc: 'Read book pages to focus mind', types: [5, 10, 20] },
+    { id: 'meditation', title: 'Meditate', icon: '🧘‍♀️', desc: 'Meditation to center yourself', types: [2, 5, 10] }
   ];
 
   // AI Voice Messages based on goals and tone with persona integration
@@ -353,10 +390,13 @@ export default function AlarmsScreen() {
       return;
     }
     
+    // Check if tasks are required after this snooze
+    const tasksRequired = alarm.ringCount + 1 >= alarm.taskRequiredAfterSnoozes;
+    
     // Enhanced alert with persona details and real voice playback
     Alert.alert(
       '🤖 AI Alarm Simulation',
-      `Ring ${alarm.ringCount + 1}:\n\n"${aiMessage.message}"\n\n👤 ${aiMessage.persona}\n🎭 ${aiMessage.accent} accent\n💫 ${aiMessage.emotionalIntensity}% emotional intensity\n🌍 ${aiMessage.culturalFlavor}\n🔊 Volume: ${aiMessage.volume}%\n💥 Intensity: ${aiMessage.intensity}/7\n📳 Haptics: ${aiMessage.haptics ? 'ON' : 'OFF'}`,
+      `Ring ${alarm.ringCount + 1}:\n\n"${aiMessage.message}"\n\n👤 ${aiMessage.persona}\n🎭 ${aiMessage.accent} accent\n💫 ${aiMessage.emotionalIntensity}% emotional intensity\n🌍 ${aiMessage.culturalFlavor}\n🔊 Volume: ${aiMessage.volume}%\n💥 Intensity: ${aiMessage.intensity}/7\n📳 Haptics: ${aiMessage.haptics ? 'ON' : 'OFF'}${tasksRequired ? '\n\n⚠️ Tasks required to stop alarm!' : ''}`,
       [
         { 
           text: 'Snooze', 
@@ -374,18 +414,33 @@ export default function AlarmsScreen() {
             } catch (error) {
               console.error('Error playing alarm voice:', error);
             }
+            
+            // If tasks are required, show task completion modal
+            if (tasksRequired && alarm.tasks.length > 0) {
+              setCurrentTaskAlarm(alarm);
+              setCurrentTaskIndex(0);
+              setTaskProgress({});
+              setShowTaskModal(true);
+            }
           }
         },
         { 
-          text: 'Stop', 
-          style: 'destructive', 
+          text: tasksRequired ? 'Complete Tasks' : 'Stop', 
+          style: tasksRequired ? 'default' : 'destructive', 
           onPress: async () => {
-            setAlarms(prev => prev.map(a => 
-              a.id === alarm.id ? { ...a, ringCount: 0 } : a
-            ));
-            
-            // Stop any playing voice
-            await VoiceService.stop();
+            if (tasksRequired && alarm.tasks.length > 0) {
+              setCurrentTaskAlarm(alarm);
+              setCurrentTaskIndex(0);
+              setTaskProgress({});
+              setShowTaskModal(true);
+            } else {
+              setAlarms(prev => prev.map(a => 
+                a.id === alarm.id ? { ...a, ringCount: 0 } : a
+              ));
+              
+              // Stop any playing voice
+              await VoiceService.stop();
+            }
           }
         }
       ]
@@ -418,13 +473,16 @@ export default function AlarmsScreen() {
   };
 
   const handleAlarmEdit = (alarm) => {
+    console.log('Edit alarm button pressed for:', alarm.label);
     setEditingAlarm(alarm);
     setNewAlarm({
       time: alarm.time,
       label: alarm.label,
       days: alarm.days,
       morningGoal: alarm.morningGoal,
-      aiVoiceEnabled: alarm.aiVoiceEnabled
+      aiVoiceEnabled: alarm.aiVoiceEnabled,
+      tasks: alarm.tasks,
+      taskRequiredAfterSnoozes: alarm.taskRequiredAfterSnoozes
     });
     
     // Initialize selected days based on alarm days
@@ -441,17 +499,22 @@ export default function AlarmsScreen() {
     setSelectedDays(newSelectedDays);
     
     setShowEditModal(true);
+    console.log('showEditModal set to true');
   };
 
   const handleAddAlarm = () => {
+    console.log('Add alarm button pressed');
     setNewAlarm({
       time: '7:00 AM',
       label: '',
       days: 'Mon - Fri',
       morningGoal: 'stretching',
-      aiVoiceEnabled: true
+      aiVoiceEnabled: true,
+      tasks: [],
+      taskRequiredAfterSnoozes: 2
     });
     setShowAddModal(true);
+    console.log('showAddModal set to true');
   };
 
   const timeOptions = [
@@ -514,7 +577,9 @@ export default function AlarmsScreen() {
       scale: new Animated.Value(1),
       morningGoal: newAlarm.morningGoal,
       aiVoiceEnabled: newAlarm.aiVoiceEnabled,
-      ringCount: 0
+      ringCount: 0,
+      tasks: newAlarm.tasks,
+      taskRequiredAfterSnoozes: newAlarm.taskRequiredAfterSnoozes
     };
 
     setAlarms(prev => [...prev, alarm]);
@@ -537,7 +602,7 @@ export default function AlarmsScreen() {
     setAlarms(prevAlarms => 
       prevAlarms.map(alarm => 
         alarm.id === editingAlarm.id 
-          ? { ...alarm, time: newAlarm.time, label: newAlarm.label.trim(), days: daysText, morningGoal: newAlarm.morningGoal, aiVoiceEnabled: newAlarm.aiVoiceEnabled }
+          ? { ...alarm, time: newAlarm.time, label: newAlarm.label.trim(), days: daysText, morningGoal: newAlarm.morningGoal, aiVoiceEnabled: newAlarm.aiVoiceEnabled, tasks: newAlarm.tasks, taskRequiredAfterSnoozes: newAlarm.taskRequiredAfterSnoozes }
           : alarm
       )
     );
@@ -585,8 +650,320 @@ export default function AlarmsScreen() {
     setSettings(prev => ({ ...prev, [settingKey]: value }));
   };
 
+  // Task management functions
+  const addTaskToAlarm = (taskType, taskConfig) => {
+    const task = availableTasks.find(t => t.id === taskType);
+    if (!task) return;
+
+    let newTask = {
+      id: Date.now(),
+      type: taskType,
+      title: '',
+      completed: false,
+      icon: task.icon
+    };
+
+    // Configure task based on type
+    switch (taskType) {
+      case 'steps':
+        newTask.title = `Walk ${taskConfig} steps`;
+        newTask.target = taskConfig;
+        newTask.current = 0;
+        break;
+      case 'math':
+        newTask.title = `Solve ${taskConfig} math problems`;
+        newTask.target = taskConfig;
+        newTask.current = 0;
+        break;
+      case 'photo':
+        newTask.title = `Take photo of ${taskConfig}`;
+        newTask.description = `Capture yourself ${taskConfig}`;
+        break;
+      case 'water':
+        newTask.title = `Drink ${taskConfig} glass${taskConfig > 1 ? 'es' : ''} of water`;
+        newTask.target = taskConfig;
+        newTask.current = 0;
+        break;
+      case 'pushups':
+        newTask.title = `Complete ${taskConfig} push-ups`;
+        newTask.target = taskConfig;
+        newTask.current = 0;
+        break;
+      case 'squats':
+        newTask.title = `Complete ${taskConfig} squats`;
+        newTask.target = taskConfig;
+        newTask.current = 0;
+        break;
+      case 'reading':
+        newTask.title = `Read ${taskConfig} pages`;
+        newTask.target = taskConfig;
+        newTask.current = 0;
+        break;
+      case 'meditation':
+        newTask.title = `Meditate for ${taskConfig} minutes`;
+        newTask.target = taskConfig;
+        newTask.current = 0;
+        break;
+    }
+
+    setNewAlarm(prev => ({
+      ...prev,
+      tasks: [...prev.tasks, newTask]
+    }));
+    
+    // Close the task modals after adding
+    setShowTaskModal(false);
+    setShowTaskConfigModal(false);
+    setSelectedTaskType(null);
+  };
+
+  const handleTaskTypeSelection = (taskType) => {
+    setSelectedTaskType(taskType);
+    setShowTaskConfigModal(true);
+    setShowTaskModal(false);
+  };
+
+  const removeTaskFromAlarm = (taskId) => {
+    setNewAlarm(prev => ({
+      ...prev,
+      tasks: prev.tasks.filter(task => task.id !== taskId)
+    }));
+  };
+
+  const removeTaskFromCurrentAlarm = (taskId) => {
+    if (editingAlarm) {
+      setNewAlarm(prev => ({
+        ...prev,
+        tasks: prev.tasks.filter(task => task.id !== taskId)
+      }));
+    }
+  };
+
+  const updateTaskProgress = (taskId, progress) => {
+    setTaskProgress(prev => ({
+      ...prev,
+      [taskId]: progress
+    }));
+  };
+
+  const completeTask = (taskId) => {
+    if (currentTaskAlarm) {
+      setAlarms(prev => prev.map(alarm => {
+        if (alarm.id === currentTaskAlarm.id) {
+          return {
+            ...alarm,
+            tasks: alarm.tasks.map(task => 
+              task.id === taskId ? { ...task, completed: true } : task
+            )
+          };
+        }
+        return alarm;
+      }));
+    }
+  };
+
+  const checkAllTasksCompleted = () => {
+    if (!currentTaskAlarm) return false;
+    return currentTaskAlarm.tasks.every(task => task.completed);
+  };
+
+  const handleTaskCompletion = async () => {
+    if (checkAllTasksCompleted()) {
+      // Reset alarm ring count and stop alarm
+      setAlarms(prev => prev.map(a => 
+        a.id === currentTaskAlarm.id ? { ...a, ringCount: 0 } : a
+      ));
+      
+      // Stop any playing voice
+      await VoiceService.stop();
+      
+      // Close task modal
+      setShowTaskModal(false);
+      setCurrentTaskAlarm(null);
+      setCurrentTaskIndex(0);
+      setTaskProgress({});
+      
+      Alert.alert('🎉 Tasks Completed!', 'Great job! Your alarm has been stopped.');
+    }
+  };
+
+  const renderTaskCompletion = (task) => {
+    switch (task.type) {
+      case 'steps':
+        return (
+          <View style={styles.taskCompletionContainer}>
+            <Text style={styles.taskCompletionTitle}>{task.title}</Text>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View 
+                  style={[
+                    styles.progressFill, 
+                    { width: `${Math.min((taskProgress[task.id] || 0) / task.target * 100, 100)}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {taskProgress[task.id] || 0} / {task.target} steps
+              </Text>
+            </View>
+            <View style={styles.stepButtons}>
+              <TouchableOpacity 
+                style={styles.stepButton}
+                onPress={() => updateTaskProgress(task.id, (taskProgress[task.id] || 0) + 10)}
+              >
+                <Text style={styles.stepButtonText}>+10</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.stepButton}
+                onPress={() => updateTaskProgress(task.id, (taskProgress[task.id] || 0) + 25)}
+              >
+                <Text style={styles.stepButtonText}>+25</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.stepButton}
+                onPress={() => updateTaskProgress(task.id, (taskProgress[task.id] || 0) + 50)}
+              >
+                <Text style={styles.stepButtonText}>+50</Text>
+              </TouchableOpacity>
+            </View>
+            {(taskProgress[task.id] || 0) >= task.target && (
+              <TouchableOpacity 
+                style={styles.completeTaskButton}
+                onPress={() => completeTask(task.id)}
+              >
+                <Text style={styles.completeTaskButtonText}>Complete Task</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+
+      case 'math':
+        return (
+          <View style={styles.taskCompletionContainer}>
+            <Text style={styles.taskCompletionTitle}>{task.title}</Text>
+            <Text style={styles.taskCompletionSubtitle}>
+              Solve simple math problems to complete this task
+            </Text>
+            <View style={styles.mathProblemsContainer}>
+              {[1, 2, 3].map((_, index) => {
+                const num1 = Math.floor(Math.random() * 20) + 1;
+                const num2 = Math.floor(Math.random() * 20) + 1;
+                const answer = num1 + num2;
+                return (
+                  <View key={index} style={styles.mathProblem}>
+                    <Text style={styles.mathProblemText}>
+                      {num1} + {num2} = ?
+                    </Text>
+                    <TextInput 
+                      style={styles.mathAnswerInput}
+                      placeholder="Answer"
+                      keyboardType="numeric"
+                      onChangeText={(text) => {
+                        if (parseInt(text) === answer) {
+                          // Mark this problem as solved
+                          const currentSolved = taskProgress[task.id] || 0;
+                          updateTaskProgress(task.id, currentSolved + 1);
+                        }
+                      }}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+            <Text style={styles.mathProgressText}>
+              Solved: {taskProgress[task.id] || 0} / {task.target} problems
+            </Text>
+            {(taskProgress[task.id] || 0) >= task.target && (
+              <TouchableOpacity 
+                style={styles.completeTaskButton}
+                onPress={() => completeTask(task.id)}
+              >
+                <Text style={styles.completeTaskButtonText}>Complete Task</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+
+      case 'photo':
+        return (
+          <View style={styles.taskCompletionContainer}>
+            <Text style={styles.taskCompletionTitle}>{task.title}</Text>
+            <Text style={styles.taskCompletionSubtitle}>{task.description}</Text>
+            <View style={styles.photoTaskContainer}>
+              <TouchableOpacity 
+                style={styles.cameraButton}
+                onPress={() => {
+                  // Simulate taking a photo
+                  Alert.alert(
+                    'Photo Task',
+                    'Photo captured! This simulates taking a photo for the task.',
+                    [
+                      { text: 'OK', onPress: () => completeTask(task.id) }
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.cameraButtonText}>📸 Take Photo</Text>
+              </TouchableOpacity>
+              <Text style={styles.photoTaskHint}>
+                Tap the button to simulate taking a photo
+              </Text>
+            </View>
+          </View>
+        );
+
+      case 'water':
+        return (
+          <View style={styles.taskCompletionContainer}>
+            <Text style={styles.taskCompletionTitle}>{task.title}</Text>
+            <View style={styles.waterGlassesContainer}>
+              {Array.from({ length: task.target }, (_, index) => (
+                <TouchableOpacity 
+                  key={index}
+                  style={[
+                    styles.waterGlass,
+                    (taskProgress[task.id] || 0) > index && styles.waterGlassFilled
+                  ]}
+                  onPress={() => updateTaskProgress(task.id, index + 1)}
+                >
+                  <Text style={styles.waterGlassText}>💧</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.waterProgressText}>
+              {taskProgress[task.id] || 0} / {task.target} glasses
+            </Text>
+            {(taskProgress[task.id] || 0) >= task.target && (
+              <TouchableOpacity 
+                style={styles.completeTaskButton}
+                onPress={() => completeTask(task.id)}
+              >
+                <Text style={styles.completeTaskButtonText}>Complete Task</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+
+      default:
+        return (
+          <View style={styles.taskCompletionContainer}>
+            <Text style={styles.taskCompletionTitle}>{task.title}</Text>
+            <TouchableOpacity 
+              style={styles.completeTaskButton}
+              onPress={() => completeTask(task.id)}
+            >
+              <Text style={styles.completeTaskButtonText}>Complete Task</Text>
+            </TouchableOpacity>
+          </View>
+        );
+    }
+  };
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      contentContainerStyle={styles.containerContent}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>⏰ Alarms</Text>
@@ -594,7 +971,12 @@ export default function AlarmsScreen() {
       </View>
 
       {/* Add Alarm Button */}
-      <TouchableOpacity style={styles.addButton} onPress={handleAddAlarm} activeOpacity={0.8}>
+      <TouchableOpacity 
+        style={styles.addButton} 
+        onPress={handleAddAlarm} 
+        activeOpacity={0.6}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
         <Text style={styles.addButtonIcon}>+</Text>
         <Text style={styles.addButtonText}>Add New Alarm</Text>
       </TouchableOpacity>
@@ -607,7 +989,8 @@ export default function AlarmsScreen() {
               style={styles.alarmItem} 
               onPress={() => handleAlarmEdit(alarm)}
               onLongPress={() => deleteAlarm(alarm.id)}
-              activeOpacity={0.8}
+              activeOpacity={0.6}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
             >
               <View style={styles.alarmInfo}>
                 <Text style={styles.alarmTime}>{alarm.time}</Text>
@@ -620,7 +1003,28 @@ export default function AlarmsScreen() {
                   {alarm.aiVoiceEnabled && (
                     <Text style={styles.aiVoiceIndicator}>🤖 AI Voice</Text>
                   )}
+                  {alarm.tasks.length > 0 && (
+                    <Text style={styles.taskIndicator}>
+                      📋 {alarm.tasks.length} task{alarm.tasks.length > 1 ? 's' : ''} after {alarm.taskRequiredAfterSnoozes} snooze{alarm.taskRequiredAfterSnoozes > 1 ? 's' : ''}
+                    </Text>
+                  )}
                 </View>
+                {alarm.tasks.length > 0 && (
+                  <View style={styles.taskPreviewContainer}>
+                    <Text style={styles.taskPreviewTitle}>Tasks:</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.taskPreviewList}>
+                      {alarm.tasks.slice(0, 3).map((task, index) => (
+                        <View key={task.id} style={styles.taskPreviewItem}>
+                          <Text style={styles.taskPreviewIcon}>{task.icon}</Text>
+                          <Text style={styles.taskPreviewText}>{task.title}</Text>
+                        </View>
+                      ))}
+                      {alarm.tasks.length > 3 && (
+                        <Text style={styles.taskPreviewMore}>+{alarm.tasks.length - 3} more</Text>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
               <View style={styles.alarmActions}>
                 <TouchableOpacity 
@@ -823,6 +1227,41 @@ export default function AlarmsScreen() {
               </TouchableOpacity>
             </View>
 
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Tasks</Text>
+              <Text style={styles.inputSubtitle}>Add tasks to complete after multiple snoozes</Text>
+              <TouchableOpacity
+                style={styles.addTaskButton}
+                onPress={() => {
+                  setShowTaskModal(true);
+                }}
+              >
+                <Text style={styles.addTaskButtonText}>Add Tasks</Text>
+              </TouchableOpacity>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={styles.taskList}
+                contentContainerStyle={styles.taskListContent}
+              >
+                {newAlarm.tasks.map((task, index) => (
+                  <View key={task.id} style={styles.taskItem}>
+                    <Text style={styles.taskIcon}>{task.icon}</Text>
+                    <View style={styles.taskDetails}>
+                      <Text style={styles.taskTitle}>{task.title}</Text>
+                      <Text style={styles.taskType}>{task.type}</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.removeTaskButton}
+                      onPress={() => removeTaskFromAlarm(task.id)}
+                    >
+                      <Text style={styles.removeTaskButtonText}>✗</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setShowAddModal(false)}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -936,6 +1375,67 @@ export default function AlarmsScreen() {
                   {newAlarm.aiVoiceEnabled ? 'Enabled' : 'Disabled'}
                 </Text>
               </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Tasks</Text>
+              <Text style={styles.inputSubtitle}>Add tasks to complete after multiple snoozes</Text>
+              
+              {newAlarm.tasks.length > 0 && (
+                <View style={styles.taskConfigSection}>
+                  <Text style={styles.taskConfigLabel}>Tasks required after:</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.snoozeOptions}>
+                    {[1, 2, 3, 4, 5].map((snooze) => (
+                      <TouchableOpacity
+                        key={snooze}
+                        style={[
+                          styles.snoozeOption,
+                          newAlarm.taskRequiredAfterSnoozes === snooze && styles.selectedSnoozeOption
+                        ]}
+                        onPress={() => setNewAlarm(prev => ({ ...prev, taskRequiredAfterSnoozes: snooze }))}
+                      >
+                        <Text style={[
+                          styles.snoozeOptionText,
+                          newAlarm.taskRequiredAfterSnoozes === snooze && styles.selectedSnoozeOptionText
+                        ]}>
+                          {snooze} snooze{snooze > 1 ? 's' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              
+              <TouchableOpacity
+                style={styles.addTaskButton}
+                onPress={() => {
+                  setShowTaskModal(true);
+                }}
+              >
+                <Text style={styles.addTaskButtonText}>Add Tasks</Text>
+              </TouchableOpacity>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={styles.taskList}
+                contentContainerStyle={styles.taskListContent}
+              >
+                {newAlarm.tasks.map((task, index) => (
+                  <View key={task.id} style={styles.taskItem}>
+                    <Text style={styles.taskIcon}>{task.icon}</Text>
+                    <View style={styles.taskDetails}>
+                      <Text style={styles.taskTitle}>{task.title}</Text>
+                      <Text style={styles.taskType}>{task.type}</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.removeTaskButton}
+                      onPress={() => removeTaskFromAlarm(task.id)}
+                    >
+                      <Text style={styles.removeTaskButtonText}>✗</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
             </View>
 
             <View style={styles.modalButtons}>
@@ -1053,6 +1553,174 @@ export default function AlarmsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Task Selection Modal */}
+      <Modal visible={showTaskModal && !showTaskConfigModal} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Tasks</Text>
+            <Text style={styles.modalSubtitle}>
+              Select tasks to complete after multiple snoozes
+              {newAlarm.tasks.length > 0 && ` (${newAlarm.tasks.length} added)`}
+            </Text>
+            
+            <ScrollView 
+              style={styles.taskSelectionContainer}
+              contentContainerStyle={styles.taskSelectionContent}
+            >
+              {availableTasks.map((task) => {
+                const isAlreadyAdded = newAlarm.tasks.some(t => t.type === task.id);
+                return (
+                  <TouchableOpacity
+                    key={task.id}
+                    style={[
+                      styles.taskSelectionItem,
+                      isAlreadyAdded && styles.taskSelectionItemAdded
+                    ]}
+                    onPress={() => handleTaskTypeSelection(task.id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.taskSelectionHeader}>
+                      <Text style={styles.taskSelectionIcon}>{task.icon}</Text>
+                      <View style={styles.taskSelectionInfo}>
+                        <Text style={styles.taskSelectionTitle}>{task.title}</Text>
+                        <Text style={styles.taskSelectionDesc}>{task.desc}</Text>
+                        {isAlreadyAdded && (
+                          <Text style={styles.taskSelectionAdded}>✓ Already added</Text>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowTaskModal(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              {newAlarm.tasks.length > 0 && (
+                <TouchableOpacity style={styles.saveButton} onPress={() => setShowTaskModal(false)}>
+                  <Text style={styles.saveButtonText}>Done</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Task Configuration Modal */}
+      <Modal visible={showTaskConfigModal} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Configure Task</Text>
+            <Text style={styles.modalSubtitle}>
+              {selectedTaskType && availableTasks.find(t => t.id === selectedTaskType)?.title}
+            </Text>
+            
+            <ScrollView 
+              style={styles.taskConfigContainer}
+              contentContainerStyle={styles.taskConfigContent}
+            >
+              {selectedTaskType && availableTasks.find(t => t.id === selectedTaskType)?.types.map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={styles.taskConfigOption}
+                  onPress={() => addTaskToAlarm(selectedTaskType, type)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.taskConfigOptionText}>{type}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => {
+                  setShowTaskConfigModal(false);
+                  setShowTaskModal(true);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => {
+                  setShowTaskConfigModal(false);
+                  setShowTaskModal(false);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Task Completion Modal */}
+      <Modal visible={showTaskModal && currentTaskAlarm?.tasks?.length > 0 && !showTaskConfigModal} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Complete Tasks</Text>
+            <Text style={styles.modalSubtitle}>
+              Complete all tasks to stop the alarm
+            </Text>
+            
+            <View style={styles.taskProgressHeader}>
+              <Text style={styles.taskProgressText}>
+                Task {currentTaskIndex + 1} of {currentTaskAlarm?.tasks?.length}
+              </Text>
+              <View style={styles.taskProgressBar}>
+                <View 
+                  style={[
+                    styles.taskProgressFill, 
+                    { width: `${((currentTaskIndex + 1) / (currentTaskAlarm?.tasks?.length || 1)) * 100}%` }
+                  ]} 
+                />
+              </View>
+            </View>
+            
+            <ScrollView 
+              style={styles.taskCompletionContainer}
+              contentContainerStyle={styles.taskCompletionContent}
+            >
+              {currentTaskAlarm?.tasks?.[currentTaskIndex] && 
+                renderTaskCompletion(currentTaskAlarm.tasks[currentTaskIndex])
+              }
+            </ScrollView>
+            
+            <View style={styles.taskNavigationButtons}>
+              {currentTaskIndex > 0 && (
+                <TouchableOpacity 
+                  style={styles.taskNavButton}
+                  onPress={() => setCurrentTaskIndex(prev => prev - 1)}
+                >
+                  <Text style={styles.taskNavButtonText}>Previous</Text>
+                </TouchableOpacity>
+              )}
+              
+              {currentTaskIndex < (currentTaskAlarm?.tasks?.length || 0) - 1 && (
+                <TouchableOpacity 
+                  style={styles.taskNavButton}
+                  onPress={() => setCurrentTaskIndex(prev => prev + 1)}
+                >
+                  <Text style={styles.taskNavButtonText}>Next</Text>
+                </TouchableOpacity>
+              )}
+              
+              {checkAllTasksCompleted() && (
+                <TouchableOpacity 
+                  style={styles.completeAllTasksButton}
+                  onPress={handleTaskCompletion}
+                >
+                  <Text style={styles.completeAllTasksButtonText}>Stop Alarm</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1061,6 +1729,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fdf6ec',
+  },
+  containerContent: {
+    flexGrow: 1,
   },
   header: {
     backgroundColor: '#55786f',
@@ -1162,23 +1833,71 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 5,
-    gap: 10,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   alarmGoal: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#55786f',
     backgroundColor: '#e8f5e8',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  aiVoiceIndicator: {
-    fontSize: 11,
-    color: '#e07a5f',
-    backgroundColor: '#ffe8e0',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
+  },
+  aiVoiceIndicator: {
+    fontSize: 10,
+    color: '#e07a5f',
+    backgroundColor: '#ffe8e0',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  taskIndicator: {
+    fontSize: 10,
+    color: '#55786f',
+    backgroundColor: '#e8f5e8',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  taskPreviewContainer: {
+    marginTop: 8,
+  },
+  taskPreviewTitle: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 5,
+  },
+  taskPreviewList: {
+    flexDirection: 'row',
+    maxHeight: 80,
+  },
+  taskPreviewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 6,
+    minWidth: 80,
+    maxWidth: 120,
+  },
+  taskPreviewIcon: {
+    fontSize: 12,
+    marginRight: 4,
+  },
+  taskPreviewText: {
+    fontSize: 10,
+    color: '#666',
+    maxWidth: 70,
+    flexShrink: 1,
+  },
+  taskPreviewMore: {
+    fontSize: 10,
+    color: '#999',
+    fontStyle: 'italic',
+    alignSelf: 'center',
   },
   testAlarmButton: {
     width: 30,
@@ -1268,22 +1987,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 20,
+    zIndex: 1000,
   },
   modalContent: {
     backgroundColor: '#ffffff',
     borderRadius: 15,
     padding: 25,
-    width: '80%',
+    width: '90%',
+    maxHeight: '85%',
     alignItems: 'center',
+    zIndex: 1001,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#55786f',
-    marginBottom: 20,
+    marginBottom: 15,
+    textAlign: 'center',
   },
   inputGroup: {
-    marginBottom: 15,
+    marginBottom: 20,
     width: '100%',
   },
   inputLabel: {
@@ -1391,13 +2115,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
-    marginTop: 20,
+    marginTop: 15,
+    gap: 15,
   },
   cancelButton: {
     backgroundColor: '#e07a5f',
     paddingVertical: 12,
     paddingHorizontal: 25,
     borderRadius: 10,
+    flex: 1,
+    alignItems: 'center',
   },
   cancelButtonText: {
     color: '#ffffff',
@@ -1409,6 +2136,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 25,
     borderRadius: 10,
+    flex: 1,
+    alignItems: 'center',
   },
   saveButtonText: {
     color: '#ffffff',
@@ -1431,5 +2160,396 @@ const styles = StyleSheet.create({
   },
   selectedOptionText: {
     color: '#ffffff',
+  },
+  addTaskButton: {
+    backgroundColor: '#e07a5f',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  addTaskButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  taskList: {
+    flexDirection: 'row',
+    marginTop: 10,
+    maxHeight: 120,
+  },
+  taskListContent: {
+    alignItems: 'center',
+  },
+  taskItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    padding: 10,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    minWidth: 150,
+    maxWidth: 200,
+  },
+  taskIcon: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  taskDetails: {
+    flex: 1,
+  },
+  taskTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  taskType: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  removeTaskButton: {
+    padding: 5,
+  },
+  removeTaskButtonText: {
+    fontSize: 16,
+    color: '#e07a5f',
+  },
+  taskConfigSection: {
+    marginBottom: 15,
+  },
+  taskConfigLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  snoozeOptions: {
+    flexDirection: 'row',
+  },
+  snoozeOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginRight: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  selectedSnoozeOption: {
+    backgroundColor: '#55786f',
+    borderColor: '#55786f',
+  },
+  snoozeOptionText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  selectedSnoozeOptionText: {
+    color: '#ffffff',
+  },
+  // Task selection modal styles
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  taskSelectionContainer: {
+    maxHeight: 300,
+    width: '100%',
+    marginBottom: 15,
+  },
+  taskSelectionContent: {
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  taskSelectionItem: {
+    marginBottom: 15,
+    padding: 15,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    minHeight: 60,
+  },
+  taskSelectionItemAdded: {
+    backgroundColor: '#e8f5e8',
+    borderWidth: 1,
+    borderColor: '#55786f',
+  },
+  taskSelectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  taskSelectionIcon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  taskSelectionInfo: {
+    flex: 1,
+  },
+  taskSelectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  taskSelectionDesc: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  taskSelectionAdded: {
+    fontSize: 11,
+    color: '#55786f',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  taskTypeOptions: {
+    flexDirection: 'row',
+  },
+  taskTypeOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    backgroundColor: '#55786f',
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  taskTypeOptionText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  // Task configuration modal styles
+  taskConfigContainer: {
+    maxHeight: 250,
+    width: '100%',
+    marginBottom: 15,
+  },
+  taskConfigContent: {
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  taskConfigOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#55786f',
+    borderRadius: 10,
+    marginBottom: 8,
+    minHeight: 50,
+  },
+  taskConfigOptionText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // Task completion modal styles
+  taskProgressHeader: {
+    marginBottom: 20,
+    width: '100%',
+  },
+  taskProgressText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  taskProgressBar: {
+    height: 4,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  taskProgressFill: {
+    height: '100%',
+    backgroundColor: '#55786f',
+  },
+  taskCompletionContainer: {
+    width: '100%',
+    marginBottom: 20,
+    maxHeight: 300,
+  },
+  taskCompletionContent: {
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  taskCompletionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  taskCompletionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  progressContainer: {
+    marginBottom: 15,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#55786f',
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  stepButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 15,
+    gap: 8,
+  },
+  stepButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#e07a5f',
+    borderRadius: 8,
+    flex: 1,
+    alignItems: 'center',
+  },
+  stepButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  completeTaskButton: {
+    backgroundColor: '#55786f',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  completeTaskButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  mathProblemsContainer: {
+    marginBottom: 15,
+    maxHeight: 150,
+  },
+  mathProblem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    minHeight: 40,
+  },
+  mathProblemText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  mathAnswerInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 8,
+    width: 80,
+    textAlign: 'center',
+  },
+  mathProgressText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  photoTaskContainer: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  cameraButton: {
+    backgroundColor: '#e07a5f',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  cameraButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  photoTaskHint: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  waterGlassesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 15,
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  waterGlass: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ccc',
+  },
+  waterGlassFilled: {
+    backgroundColor: '#87CEEB',
+    borderColor: '#55786f',
+  },
+  waterGlassText: {
+    fontSize: 20,
+  },
+  waterProgressText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  taskNavigationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 15,
+    gap: 10,
+  },
+  taskNavButton: {
+    backgroundColor: '#e07a5f',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    flex: 1,
+    alignItems: 'center',
+  },
+  taskNavButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  completeAllTasksButton: {
+    backgroundColor: '#55786f',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 10,
+    flex: 2,
+    alignItems: 'center',
+  },
+  completeAllTasksButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 }); 
