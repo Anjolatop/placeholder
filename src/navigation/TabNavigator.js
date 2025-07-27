@@ -7,6 +7,7 @@ import HomeScreen from '../screens/HomeScreen';
 import AlarmsScreen from '../screens/AlarmsScreen';
 import StatsScreen from '../screens/StatsScreen';
 import VoiceScreen from '../screens/VoiceScreen';
+import PreferencesScreen from '../screens/PreferencesScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -66,6 +67,15 @@ export default function TabNavigator() {
         options={{
           tabBarIcon: ({ focused }) => (
             <TabBarIcon focused={focused} icon="🎤" label="Voice" />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Preferences"
+        component={PreferencesScreen}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabBarIcon focused={focused} icon="⚙️" label="Settings" />
           ),
         }}
       />
