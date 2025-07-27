@@ -1,4 +1,5 @@
-import { AIGenerationRequest, AIGenerationResponse, VoiceMessage } from '../types';
+import { AIGenerationRequest, AIGenerationResponse, VoiceMessage, SongStructure } from '../types';
+import SingingService from './singingService';
 
 class AIVoiceService {
   constructor() {
@@ -6,14 +7,34 @@ class AIVoiceService {
     this.elevenLabsKey = process.env.ELEVENLABS_API_KEY;
     this.baseUrl = 'https://api.openai.com/v1';
     this.elevenLabsUrl = 'https://api.elevenlabs.io/v1';
+    this.singingService = new SingingService();
   }
 
   /**
-   * Generate personalized wake-up message using GPT-4
+   * Generate personalized wake-up message using GPT-4 with singing capabilities
    */
   async generateWakeUpMessage(request: AIGenerationRequest): Promise<AIGenerationResponse> {
     try {
-      const prompt = this.buildPrompt(request);
+      // Check if user wants singing or if behavioral triggers suggest it
+      const shouldSing = this.shouldGenerateSong(request);
+      
+      if (shouldSing) {
+        return await this.generateSingingMessage(request);
+      } else {
+        return await this.generateSpokenMessage(request);
+      }
+    } catch (error) {
+      console.error('Error generating wake-up message:', error);
+      return this.getFallbackMessage(request);
+    }
+  }
+
+  /**
+   * Generate spoken wake-up message
+   */
+  async generateSpokenMessage(request: AIGenerationRequest): Promise<AIGenerationResponse> {
+    try {
+      const prompt = this.buildSpokenPrompt(request);
       
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -49,15 +70,71 @@ class AIVoiceService {
       const content = data.choices[0].message.content;
       return this.parseAIResponse(content, request);
     } catch (error) {
-      console.error('Error generating wake-up message:', error);
-      return this.getFallbackMessage(request);
+      throw error;
     }
   }
 
   /**
-   * Build the prompt for AI generation
+   * Generate singing wake-up message using the singing service
    */
-  buildPrompt(request: AIGenerationRequest): string {
+  async generateSingingMessage(request: AIGenerationRequest): Promise<AIGenerationResponse> {
+    try {
+      const songData = await this.singingService.generateSong(
+        request.userProfile,
+        request.alarm,
+        request.context
+      );
+
+      return {
+        content: songData.content,
+        tone: request.alarm.tone || request.userProfile.preferredTone,
+        type: 'sung',
+        style: songData.voicePersona,
+        estimatedDuration: this.estimateSongDuration(songData.content),
+        emotion: this.determineSongEmotion(songData.musicStyle),
+        songStructure: songData.songStructure,
+        shouldTriggerChallenge: songData.shouldTriggerChallenge
+      };
+    } catch (error) {
+      console.error('Error generating singing message:', error);
+      // Fallback to spoken message if singing fails
+      return await this.generateSpokenMessage(request);
+    }
+  }
+
+  /**
+   * Determine if a song should be generated based on user preferences and context
+   */
+  shouldGenerateSong(request: AIGenerationRequest): boolean {
+    const { userProfile, alarm, context } = request;
+    
+    // User explicitly wants singing
+    if (userProfile.wakeStylePreference === 'sung' || alarm.includeSinging) {
+      return true;
+    }
+
+    // Mixed preference - use some logic to decide
+    if (userProfile.wakeStylePreference === 'mixed') {
+      // Sing more often for special occasions or behavioral triggers
+      if (context.snoozeCount >= 2) return true; // Intervention song
+      if (context.consecutiveSkips >= 2) return true; // Guilt trip song
+      if ([0, 6].includes(context.dayOfWeek)) return true; // Weekend vibes
+      
+      // Random chance for mixed users
+      return Math.random() > 0.6;
+    }
+
+    // Behavioral triggers that override spoken preference
+    if (context.snoozeCount >= 3) return true; // Dramatic intervention
+    if (context.recentBehavior === 'skip-prone') return true; // Special motivation
+
+    return false;
+  }
+
+  /**
+   * Build the prompt for spoken message AI generation
+   */
+  buildSpokenPrompt(request: AIGenerationRequest): string {
     const { userProfile, alarm, context } = request;
     const timeOfDay = this.getTimeOfDay(new Date());
     const dayOfWeek = new Date().getDay();
@@ -210,7 +287,37 @@ EMOTION: [encouraging/sarcastic/funny/gentle/hype]
       style: 'default',
       estimatedDuration: 15,
       emotion: 'encouraging',
+      shouldTriggerChallenge: request.context.snoozeCount >= 3
     };
+  }
+
+  /**
+   * Estimate duration of song content
+   */
+  estimateSongDuration(songContent: string): number {
+    // Songs typically take longer than spoken content due to melody and rhythm
+    const baseWordCount = songContent.split(' ').length;
+    const estimatedSeconds = Math.max(20, Math.min(45, baseWordCount * 1.5)); // 1.5 seconds per word for singing
+    return estimatedSeconds;
+  }
+
+  /**
+   * Determine emotion based on music style
+   */
+  determineSongEmotion(musicStyle: string): 'encouraging' | 'sarcastic' | 'funny' | 'gentle' | 'hype' {
+    const emotionMap = {
+      'gentle-lullaby': 'gentle',
+      'pop-anthem': 'encouraging', 
+      'rap-hype': 'hype',
+      'comedic-jingle': 'funny',
+      'r&b-smooth': 'encouraging',
+      'nursery-remix': 'funny',
+      'dramatic-song': 'sarcastic',
+      'guilt-trip-song': 'sarcastic',
+      'victory-jingle': 'hype'
+    };
+
+    return emotionMap[musicStyle] || 'encouraging';
   }
 
   /**
