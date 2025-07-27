@@ -1,6 +1,7 @@
-import PushNotification from 'react-native-push-notification';
-import { Platform, PermissionsAndroid } from 'react-native';
-import { NotificationConfig } from '../types';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { Platform } from 'react-native';
+
 
 class NotificationService {
   constructor() {
@@ -25,24 +26,19 @@ class NotificationService {
 
   async requestPermissions() {
     try {
-      if (Platform.OS === 'ios') {
-        // iOS permissions are handled by PushNotification.configure
-        return true;
-      } else if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-          {
-            title: 'WakeyTalky Notifications',
-            message: 'WakeyTalky needs notification permissions to wake you up with personalized messages.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
+      if (Device.isDevice) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
         
-        this.hasPermissions = granted === PermissionsAndroid.RESULTS.GRANTED;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        
+        this.hasPermissions = finalStatus === 'granted';
         return this.hasPermissions;
       }
+      return false;
     } catch (error) {
       console.error('Error requesting notification permissions:', error);
       return false;
@@ -50,108 +46,79 @@ class NotificationService {
   }
 
   configurePushNotifications() {
-    PushNotification.configure({
-      onRegister: function (token) {
-        console.log('TOKEN:', token);
-      },
-      onNotification: function (notification) {
-        console.log('NOTIFICATION:', notification);
-        // Handle notification tap
-        if (notification.userInteraction) {
-          this.handleNotificationTap(notification);
-        }
-      },
-      permissions: {
-        alert: true,
-        badge: true,
-        sound: true,
-      },
-      popInitialNotification: true,
-      requestPermissions: true,
+    // Configure notification handler
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
     });
 
-    // Create notification channels for Android
-    this.createNotificationChannels();
+    // Set up notification listeners
+    Notifications.addNotificationReceivedListener(this.handleNotificationReceived.bind(this));
+    Notifications.addNotificationResponseReceivedListener(this.handleNotificationResponse.bind(this));
+  }
+
+  handleNotificationReceived(notification) {
+    console.log('Notification received:', notification);
+  }
+
+  handleNotificationResponse(response) {
+    console.log('Notification response:', response);
+    this.handleNotificationTap(response);
   }
 
   createNotificationChannels() {
-    // Main alarm channel
-    PushNotification.createChannel(
+    // Create notification categories for iOS
+    Notifications.setNotificationCategoryAsync('alarm', [
       {
-        channelId: 'wakeytalky-alarms',
-        channelName: 'WakeyTalky Alarms',
-        channelDescription: 'Wake-up alarm notifications with voice messages',
-        playSound: true,
-        soundName: 'default',
-        importance: 4,
-        vibrate: true,
-        vibration: 1000,
+        identifier: 'SNOOZE',
+        buttonTitle: '⏰ Snooze',
+        options: {
+          isDestructive: false,
+          isAuthenticationRequired: false,
+        },
       },
-      (created) => console.log(`Alarm channel created: ${created}`)
-    );
+      {
+        identifier: 'DISMISS',
+        buttonTitle: '✅ Dismiss',
+        options: {
+          isDestructive: false,
+          isAuthenticationRequired: false,
+        },
+      },
+    ]);
 
-    // Challenge mode channel
-    PushNotification.createChannel(
+    // Create notification categories for challenges
+    Notifications.setNotificationCategoryAsync('challenge', [
       {
-        channelId: 'wakeytalky-challenges',
-        channelName: 'WakeyTalky Challenges',
-        channelDescription: 'Challenge mode notifications',
-        playSound: true,
-        soundName: 'default',
-        importance: 4,
-        vibrate: true,
-        vibration: 500,
+        identifier: 'START_CHALLENGE',
+        buttonTitle: '🎯 Start Challenge',
+        options: {
+          isDestructive: false,
+          isAuthenticationRequired: false,
+        },
       },
-      (created) => console.log(`Challenge channel created: ${created}`)
-    );
-
-    // Achievement channel
-    PushNotification.createChannel(
-      {
-        channelId: 'wakeytalky-achievements',
-        channelName: 'WakeyTalky Achievements',
-        channelDescription: 'Achievement unlock notifications',
-        playSound: true,
-        soundName: 'default',
-        importance: 3,
-        vibrate: true,
-        vibration: 300,
-      },
-      (created) => console.log(`Achievement channel created: ${created}`)
-    );
-
-    // Reminder channel
-    PushNotification.createChannel(
-      {
-        channelId: 'wakeytalky-reminders',
-        channelName: 'WakeyTalky Reminders',
-        channelDescription: 'General reminder notifications',
-        playSound: true,
-        soundName: 'default',
-        importance: 2,
-        vibrate: false,
-      },
-      (created) => console.log(`Reminder channel created: ${created}`)
-    );
+    ]);
   }
 
-  scheduleNotification(config: NotificationConfig) {
+  async scheduleNotification(config) {
     try {
       const notificationConfig = {
-        id: config.id,
-        channelId: config.channelId,
-        title: config.title,
-        message: config.body,
-        date: config.scheduledTime,
-        soundName: config.sound || 'default',
-        priority: config.priority,
-        userInfo: config.data || {},
-        allowWhileIdle: config.priority === 'high',
-        repeatType: 'week', // Default to weekly repeat
-        ...this.getNotificationStyle(config),
+        content: {
+          title: config.title,
+          body: config.body,
+          data: config.data || {},
+          sound: config.sound || 'default',
+          categoryIdentifier: config.categoryId || 'default',
+        },
+        trigger: {
+          date: config.scheduledTime,
+        },
       };
 
-      PushNotification.localNotificationSchedule(notificationConfig);
+      await Notifications.scheduleNotificationAsync(notificationConfig);
       
       console.log(`Notification scheduled: ${config.title}`);
       return true;
@@ -161,8 +128,8 @@ class NotificationService {
     }
   }
 
-  scheduleAlarmNotification(alarmId: string, alarm: any, scheduledTime: Date) {
-    const config: NotificationConfig = {
+  scheduleAlarmNotification(alarmId, alarm, scheduledTime) {
+    const config = {
       id: `alarm_${alarmId}`,
       title: `WakeyTalky - ${alarm.label}`,
       body: `Time to wake up! ${alarm.purpose}`,
@@ -179,8 +146,8 @@ class NotificationService {
     return this.scheduleNotification(config);
   }
 
-  scheduleChallengeNotification(alarmHistoryId: string, objectToFind: string) {
-    const config: NotificationConfig = {
+  scheduleChallengeNotification(alarmHistoryId, objectToFind) {
+    const config = {
       id: `challenge_${alarmHistoryId}`,
       title: 'Challenge Mode Activated!',
       body: `Find your ${objectToFind} to stop the alarm`,
@@ -197,8 +164,8 @@ class NotificationService {
     return this.scheduleNotification(config);
   }
 
-  scheduleAchievementNotification(achievement: any) {
-    const config: NotificationConfig = {
+  scheduleAchievementNotification(achievement) {
+    const config = {
       id: `achievement_${achievement.id}`,
       title: 'Achievement Unlocked! 🎉',
       body: `${achievement.name} - ${achievement.description}`,
@@ -214,8 +181,8 @@ class NotificationService {
     return this.scheduleNotification(config);
   }
 
-  scheduleReminderNotification(title: string, message: string, scheduledTime: Date) {
-    const config: NotificationConfig = {
+  scheduleReminderNotification(title, message, scheduledTime) {
+    const config = {
       id: `reminder_${Date.now()}`,
       title,
       body: message,
@@ -230,11 +197,9 @@ class NotificationService {
     return this.scheduleNotification(config);
   }
 
-  cancelNotification(notificationId: string) {
+  async cancelNotification(notificationId) {
     try {
-      PushNotification.cancelLocalNotifications({
-        id: notificationId,
-      });
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
       console.log(`Notification cancelled: ${notificationId}`);
       return true;
     } catch (error) {
@@ -243,9 +208,9 @@ class NotificationService {
     }
   }
 
-  cancelAllNotifications() {
+  async cancelAllNotifications() {
     try {
-      PushNotification.cancelAllLocalNotifications();
+      await Notifications.cancelAllScheduledNotificationsAsync();
       console.log('All notifications cancelled');
       return true;
     } catch (error) {
@@ -254,12 +219,10 @@ class NotificationService {
     }
   }
 
-  cancelAlarmNotifications(alarmId: string) {
+  async cancelAlarmNotifications(alarmId) {
     try {
       // Cancel all notifications for this alarm
-      PushNotification.cancelLocalNotifications({
-        id: `alarm_${alarmId}`,
-      });
+      await Notifications.cancelScheduledNotificationAsync(`alarm_${alarmId}`);
       console.log(`Alarm notifications cancelled: ${alarmId}`);
       return true;
     } catch (error) {
@@ -268,63 +231,9 @@ class NotificationService {
     }
   }
 
-  getNotificationStyle(config: NotificationConfig) {
-    // Customize notification appearance based on type
-    switch (config.channelId) {
-      case 'wakeytalky-alarms':
-        return {
-          largeIcon: 'ic_launcher',
-          smallIcon: 'ic_notification',
-          bigText: config.body,
-          subText: 'WakeyTalky',
-          color: '#e07a5f',
-          vibrate: true,
-          vibration: 1000,
-          playSound: true,
-          soundName: 'alarm_sound',
-        };
-      
-      case 'wakeytalky-challenges':
-        return {
-          largeIcon: 'ic_launcher',
-          smallIcon: 'ic_notification',
-          bigText: config.body,
-          subText: 'Challenge Mode',
-          color: '#55786f',
-          vibrate: true,
-          vibration: 500,
-          playSound: true,
-          soundName: 'challenge_sound',
-        };
-      
-      case 'wakeytalky-achievements':
-        return {
-          largeIcon: 'ic_launcher',
-          smallIcon: 'ic_notification',
-          bigText: config.body,
-          subText: 'Achievement Unlocked',
-          color: '#d8c5f3',
-          vibrate: true,
-          vibration: 300,
-          playSound: true,
-          soundName: 'achievement_sound',
-        };
-      
-      default:
-        return {
-          largeIcon: 'ic_launcher',
-          smallIcon: 'ic_notification',
-          bigText: config.body,
-          subText: 'WakeyTalky',
-          color: '#a6c3dc',
-          vibrate: false,
-          playSound: true,
-          soundName: 'default',
-        };
-    }
-  }
 
-  handleNotificationTap(notification: any) {
+
+  handleNotificationTap(notification) {
     try {
       const data = notification.userInfo;
       
@@ -358,29 +267,28 @@ class NotificationService {
   }
 
   // Getter methods
-  isInitialized(): boolean {
+  isInitialized() {
     return this.isInitialized;
   }
 
-  hasNotificationPermissions(): boolean {
+  hasNotificationPermissions() {
     return this.hasPermissions;
   }
 
   // Test notification
-  sendTestNotification() {
-    const config: NotificationConfig = {
+  async sendTestNotification() {
+    const config = {
       id: 'test_notification',
       title: 'WakeyTalky Test',
       body: 'This is a test notification from WakeyTalky!',
-      channelId: 'wakeytalky-reminders',
-      priority: 'default',
+      categoryId: 'default',
       scheduledTime: new Date(Date.now() + 5000), // 5 seconds from now
       data: {
         type: 'test',
       },
     };
 
-    return this.scheduleNotification(config);
+    return await this.scheduleNotification(config);
   }
 }
 

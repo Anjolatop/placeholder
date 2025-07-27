@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile, Alarm, UserStats, AppState } from '../types';
 
 // Initial state
-const initialState: AppState = {
+const initialState = {
   user: null,
   alarms: [],
   currentAlarm: null,
@@ -33,7 +32,7 @@ const ACTIONS = {
 };
 
 // Reducer
-function appReducer(state: AppState, action: any): AppState {
+function appReducer(state, action) {
   switch (action.type) {
     case ACTIONS.SET_USER:
       return {
@@ -172,7 +171,7 @@ export function AppProvider({ children }) {
   };
 
   // Save user data to storage
-  const saveUserData = async (key: string, data: any) => {
+  const saveUserData = async (key, data) => {
     try {
       await AsyncStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
@@ -183,30 +182,30 @@ export function AppProvider({ children }) {
   // Actions
   const actions = {
     // User actions
-    setUser: async (user: UserProfile) => {
+          setUser: async (user) => {
       dispatch({ type: ACTIONS.SET_USER, payload: user });
       await saveUserData('userProfile', user);
     },
 
-    updateUser: async (updates: Partial<UserProfile>) => {
+            updateUser: async (updates) => {
       const updatedUser = { ...state.user, ...updates };
       dispatch({ type: ACTIONS.SET_USER, payload: updatedUser });
       await saveUserData('userProfile', updatedUser);
     },
 
     // Alarm actions
-    setAlarms: async (alarms: Alarm[]) => {
+          setAlarms: async (alarms) => {
       dispatch({ type: ACTIONS.SET_ALARMS, payload: alarms });
       await saveUserData('alarms', alarms);
     },
 
-    addAlarm: async (alarm: Alarm) => {
+          addAlarm: async (alarm) => {
       dispatch({ type: ACTIONS.ADD_ALARM, payload: alarm });
       const updatedAlarms = [...state.alarms, alarm];
       await saveUserData('alarms', updatedAlarms);
     },
 
-    updateAlarm: async (alarm: Alarm) => {
+          updateAlarm: async (alarm) => {
       dispatch({ type: ACTIONS.UPDATE_ALARM, payload: alarm });
       const updatedAlarms = state.alarms.map(a => a.id === alarm.id ? alarm : a);
       await saveUserData('alarms', updatedAlarms);
@@ -218,7 +217,7 @@ export function AppProvider({ children }) {
       await saveUserData('alarms', updatedAlarms);
     },
 
-    setCurrentAlarm: (alarm: Alarm | null) => {
+          setCurrentAlarm: (alarm) => {
       dispatch({ type: ACTIONS.SET_CURRENT_ALARM, payload: alarm });
     },
 
@@ -231,12 +230,12 @@ export function AppProvider({ children }) {
     },
 
     // Stats actions
-    setUserStats: async (stats: UserStats) => {
+          setUserStats: async (stats) => {
       dispatch({ type: ACTIONS.SET_USER_STATS, payload: stats });
       await saveUserData('userStats', stats);
     },
 
-    updateUserStats: async (updates: Partial<UserStats>) => {
+          updateUserStats: async (updates) => {
       dispatch({ type: ACTIONS.UPDATE_USER_STATS, payload: updates });
       const updatedStats = { ...state.userStats, ...updates };
       await saveUserData('userStats', updatedStats);

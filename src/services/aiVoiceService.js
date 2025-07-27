@@ -1,292 +1,421 @@
-import { AIGenerationRequest, AIGenerationResponse, VoiceMessage } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
+
+// API keys should be stored in environment variables or secure storage
+// For development, you can set these in your environment or use placeholder values
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || 'YOUR_GITHUB_TOKEN_HERE';
+const GITHUB_AI_ENDPOINT = 'https://models.github.ai/inference';
+const MODEL = 'openai/gpt-4.1';
+
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || 'YOUR_ELEVENLABS_API_KEY_HERE';
+const ELEVENLABS_VOICE_ID = 'pNInz6obpgDQGcFmaJgB'; // Adam voice - more reliable
+const ELEVENLABS_ENDPOINT = 'https://api.elevenlabs.io/v1';
 
 class AIVoiceService {
   constructor() {
-    this.apiKey = process.env.OPENAI_API_KEY;
-    this.elevenLabsKey = process.env.ELEVENLABS_API_KEY;
-    this.baseUrl = 'https://api.openai.com/v1';
-    this.elevenLabsUrl = 'https://api.elevenlabs.io/v1';
+    this.userProfile = null;
+    this.alarmHistory = new Map(); // Track snooze count per alarm
+    this.currentSound = null;
   }
 
-  /**
-   * Generate personalized wake-up message using GPT-4
-   */
-  async generateWakeUpMessage(request: AIGenerationRequest): Promise<AIGenerationResponse> {
+  // Initialize the service and load user profile
+  async initialize() {
+    await this.loadUserProfile();
+  }
+
+  // Load user profile from storage
+  async loadUserProfile() {
     try {
-      const prompt = this.buildPrompt(request);
-      
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: this.getSystemPrompt(request.userProfile.preferredTone)
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 300,
-          temperature: 0.8,
-          presence_penalty: 0.1,
-          frequency_penalty: 0.1,
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
-      }
-
-      const content = data.choices[0].message.content;
-      return this.parseAIResponse(content, request);
+      const profileJson = await AsyncStorage.getItem('userProfile');
+      this.userProfile = profileJson ? JSON.parse(profileJson) : {};
     } catch (error) {
-      console.error('Error generating wake-up message:', error);
-      return this.getFallbackMessage(request);
+      console.error('Error loading user profile:', error);
+      this.userProfile = {};
     }
   }
 
-  /**
-   * Build the prompt for AI generation
-   */
-  buildPrompt(request: AIGenerationRequest): string {
-    const { userProfile, alarm, context } = request;
-    const timeOfDay = this.getTimeOfDay(new Date());
-    const dayOfWeek = new Date().getDay();
-    
-    return `
-Generate a personalized wake-up message for ${userProfile.name}.
-
-User Profile:
-- Name: ${userProfile.name}
-- Preferred Tone: ${userProfile.preferredTone}
-- Hobbies: ${userProfile.hobbies.join(', ')}
-- Goals: ${userProfile.personalGoals.join(', ')}
-- Wake Style: ${userProfile.wakeStylePreference}
-
-Alarm Details:
-- Purpose: ${alarm.purpose}
-- Label: ${alarm.label}
-- Tone: ${alarm.tone}
-
-Context:
-- Time of Day: ${timeOfDay}
-- Day of Week: ${this.getDayName(dayOfWeek)}
-- Snooze Count: ${context.snoozeCount}
-- Previous Messages: ${context.previousMessages.length}
-
-Requirements:
-1. Keep the message between 20-40 seconds when spoken
-2. Match the user's preferred tone (${userProfile.preferredTone})
-3. Include their name and alarm purpose
-4. Reference their hobbies or goals
-5. Be motivational but appropriate for the tone
-6. If snooze count > 2, make it more persistent/funny
-7. If it's a singing message, include musical notation or style direction
-
-Format the response as:
-CONTENT: [the actual message]
-TYPE: [spoken/sung/mixed]
-STYLE: [specific style like "pop-diva", "rap", "lullaby", etc.]
-EMOTION: [encouraging/sarcastic/funny/gentle/hype]
-    `;
-  }
-
-  /**
-   * Get system prompt based on tone preference
-   */
-  getSystemPrompt(tone: string): string {
-    const prompts = {
-      'delicate': `You are a gentle, caring wake-up companion. Use soft, encouraging language with warm humor. Be supportive and understanding, like a caring friend or family member.`,
-      'mid-delicate': `You are a balanced wake-up companion. Use a mix of encouragement and light humor. Be motivating but not too harsh, like a supportive coach or mentor.`,
-      'savage': `You are a sassy, no-nonsense wake-up companion. Use humor, sarcasm, and playful roasts. Be funny and direct, like a witty friend who tells it like it is.`
-    };
-    
-    return prompts[tone] || prompts['mid-delicate'];
-  }
-
-  /**
-   * Parse AI response into structured format
-   */
-  parseAIResponse(content: string, request: AIGenerationRequest): AIGenerationResponse {
-    const lines = content.split('\n');
-    let parsedContent = '';
-    let type = 'spoken';
-    let style = 'default';
-    let emotion = 'encouraging';
-
-    for (const line of lines) {
-      if (line.startsWith('CONTENT:')) {
-        parsedContent = line.replace('CONTENT:', '').trim();
-      } else if (line.startsWith('TYPE:')) {
-        type = line.replace('TYPE:', '').trim() as any;
-      } else if (line.startsWith('STYLE:')) {
-        style = line.replace('STYLE:', '').trim();
-      } else if (line.startsWith('EMOTION:')) {
-        emotion = line.replace('EMOTION:', '').trim() as any;
-      }
-    }
-
-    return {
-      content: parsedContent || content,
-      tone: request.userProfile.preferredTone,
-      type: type as any,
-      style,
-      estimatedDuration: this.estimateDuration(parsedContent),
-      emotion: emotion as any,
-    };
-  }
-
-  /**
-   * Generate voice audio using ElevenLabs
-   */
-  async generateVoiceAudio(message: VoiceMessage, voiceId: string): Promise<string> {
+  // Generate wake-up message using GitHub AI
+  async generateWakeUpMessage(alarmData, snoozeCount = 0) {
     try {
-      const response = await fetch(`${this.elevenLabsUrl}/text-to-speech/${voiceId}`, {
+      await this.loadUserProfile(); // Refresh profile data
+
+      const {
+        purpose: alarmLabel,
+        useWakeUpVoice,
+        includeSinging
+      } = alarmData;
+
+      // If user has snoozed 3+ times, force singing mode
+      const shouldSing = includeSinging || snoozeCount >= 3;
+
+      if (shouldSing) {
+        return await this.generateSingingMessage(alarmData, snoozeCount);
+      } else {
+        return await this.generateSpokenMessage(alarmData, snoozeCount);
+      }
+    } catch (error) {
+      console.error('Error generating AI message:', error);
+      // Return fallback message immediately if AI fails
+      return this.getFallbackMessage(alarmData, snoozeCount);
+    }
+  }
+
+  // Generate spoken wake-up message
+  async generateSpokenMessage(alarmData, snoozeCount) {
+    const prompt = this.buildSpokenPrompt(alarmData, snoozeCount);
+    
+    console.log('🤖 SPOKEN PROMPT SENT TO AI:');
+    console.log('='.repeat(50));
+    console.log(prompt);
+    console.log('='.repeat(50));
+    
+    const response = await fetch(`${GITHUB_AI_ENDPOINT}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a personalized wake-up assistant. Generate engaging, motivational wake-up messages that match the user\'s tone preference and personality.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.8,
+        top_p: 1.0,
+        model: MODEL
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub AI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content.trim();
+    
+    console.log('🤖 AI RESPONSE (SPOKEN):');
+    console.log(aiResponse);
+    
+    return aiResponse;
+  }
+
+  // Generate singing wake-up message
+  async generateSingingMessage(alarmData, snoozeCount) {
+    const prompt = this.buildSingingPrompt(alarmData, snoozeCount);
+    
+    console.log('🎵 SINGING PROMPT SENT TO AI:');
+    console.log('='.repeat(50));
+    console.log(prompt);
+    console.log('='.repeat(50));
+    
+    const response = await fetch(`${GITHUB_AI_ENDPOINT}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a creative songwriter. Generate fun, catchy wake-up songs that match the user\'s tone preference and personality.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.9,
+        top_p: 1.0,
+        model: MODEL
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub AI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content.trim();
+    
+    console.log('🎵 AI RESPONSE (SINGING):');
+    console.log(aiResponse);
+    
+    return aiResponse;
+  }
+
+  // Convert text to speech using ElevenLabs
+  async textToSpeech(text, isSinging = false) {
+    try {
+      console.log('🎤 Converting to speech with ElevenLabs:', text.substring(0, 50) + '...');
+      
+      const response = await fetch(`${ELEVENLABS_ENDPOINT}/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'xi-api-key': this.elevenLabsKey,
+          'xi-api-key': ELEVENLABS_API_KEY,
         },
         body: JSON.stringify({
-          text: message.content,
+          text: text,
           model_id: 'eleven_monolingual_v1',
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.0,
-            use_speaker_boost: true,
-          },
+            stability: isSinging ? 0.3 : 0.5,
+            similarity_boost: isSinging ? 0.7 : 0.5,
+            style: isSinging ? 0.8 : 0.3,
+            use_speaker_boost: true
+          }
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`ElevenLabs API error: ${response.statusText}`);
+        const errorData = await response.text();
+        console.error('ElevenLabs API response:', errorData);
+        throw new Error(`ElevenLabs API error: ${response.status} - ${errorData}`);
       }
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
+      const audioBuffer = await response.arrayBuffer();
       
-      return audioUrl;
+      if (audioBuffer === null) {
+        console.log('❌ ElevenLabs failed, using system speech as fallback');
+        // Fallback to system speech
+        const { Speech } = await import('expo-speech');
+        await Speech.speak(text, {
+          language: 'en',
+          pitch: isSinging ? 1.2 : 1.0,
+          rate: isSinging ? 0.8 : 0.9,
+        });
+        return null;
+      }
+
+      return audioBuffer;
     } catch (error) {
-      console.error('Error generating voice audio:', error);
-      throw error;
+      console.error('Error with ElevenLabs TTS:', error);
+      console.log('❌ ElevenLabs failed, using system speech as fallback');
+      
+      try {
+        const { Speech } = await import('expo-speech');
+        await Speech.speak(text, {
+          language: 'en',
+          pitch: isSinging ? 1.2 : 1.0,
+          rate: isSinging ? 0.8 : 0.9,
+        });
+      } catch (speechError) {
+        console.error('❌ Fallback speech error:', speechError);
+      }
+      
+      return null;
     }
   }
 
-  /**
-   * Generate singing voice using specialized models
-   */
-  async generateSingingVoice(message: VoiceMessage, style: string): Promise<string> {
-    // This would integrate with Bark, DiffSinger, or Voicemod APIs
-    // For now, return a placeholder
-    console.log(`Generating singing voice for style: ${style}`);
-    return 'placeholder_singing_audio_url';
-  }
-
-  /**
-   * Get fallback message if AI generation fails
-   */
-  getFallbackMessage(request: AIGenerationRequest): AIGenerationResponse {
-    const { userProfile, alarm } = request;
-    const fallbackMessages = {
-      'delicate': `Good morning, ${userProfile.name}. It's time to start your day. You have great things ahead of you.`,
-      'mid-delicate': `Hey ${userProfile.name}, time to get up! Your ${alarm.purpose} is waiting for you.`,
-      'savage': `Alright ${userProfile.name}, enough sleeping. Time to adult and tackle that ${alarm.purpose}.`
-    };
-
-    return {
-      content: fallbackMessages[userProfile.preferredTone],
-      tone: userProfile.preferredTone,
-      type: 'spoken',
-      style: 'default',
-      estimatedDuration: 15,
-      emotion: 'encouraging',
-    };
-  }
-
-  /**
-   * Estimate duration of spoken content
-   */
-  estimateDuration(content: string): number {
-    const wordsPerMinute = 150;
-    const words = content.split(' ').length;
-    return Math.ceil((words / wordsPerMinute) * 60);
-  }
-
-  /**
-   * Get time of day
-   */
-  getTimeOfDay(date: Date): string {
-    const hour = date.getHours();
-    if (hour < 12) return 'morning';
-    if (hour < 17) return 'noon';
-    if (hour < 21) return 'evening';
-    return 'night';
-  }
-
-  /**
-   * Get day name
-   */
-  getDayName(day: number): string {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[day];
-  }
-
-  /**
-   * Generate challenge mode message
-   */
-  async generateChallengeMessage(userName: string, objectToFind: string): Promise<string> {
-    const prompt = `
-Generate a funny challenge message for ${userName} who needs to find a ${objectToFind}.
-
-Requirements:
-- Be humorous and engaging
-- Mention the object they need to find
-- Give them a time limit
-- Make it sound like a game
-- Keep it under 30 seconds when spoken
-
-Format: Just return the message text.
-    `;
-
+  // Play audio from buffer
+  async playAudio(audioBuffer) {
     try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a fun, engaging wake-up challenge creator.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 150,
-          temperature: 0.8,
-        }),
-      });
+      if (!audioBuffer) {
+        console.log('🎤 No audio buffer to play');
+        return;
+      }
 
-      const data = await response.json();
-      return data.choices[0].message.content;
+      // Stop any currently playing audio
+      await this.stopAudio();
+
+      // Convert ArrayBuffer to base64
+      const base64Audio = this.arrayBufferToBase64(audioBuffer);
+      
+      // Create audio URI
+      const audioUri = `data:audio/mpeg;base64,${base64Audio}`;
+      
+      // Load and play audio
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUri },
+        { shouldPlay: true, volume: 1.0 }
+      );
+      
+      this.currentSound = sound;
+      
+      // Set up playback status monitoring
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) {
+          console.log('🎤 AI message spoken successfully');
+        }
+      });
+      
+      await sound.playAsync();
+      
     } catch (error) {
-      return `Okay ${userName}, no more snoozing! I need you to take a picture of your ${objectToFind}. You have 60 seconds. No cheating!`;
+      console.error('Error playing audio:', error);
     }
+  }
+
+  // Save audio buffer to file (for debugging)
+  async saveAudioToFile(audioBuffer) {
+    try {
+      const base64Audio = this.arrayBufferToBase64(audioBuffer);
+      const fileName = `ai_voice_${Date.now()}.mp3`;
+      
+      // In a real app, you'd save this to the device's file system
+      console.log(`🎵 Audio saved as ${fileName} (base64 length: ${base64Audio.length})`);
+      
+      return fileName;
+    } catch (error) {
+      console.error('Error saving audio file:', error);
+      return null;
+    }
+  }
+
+  // Convert ArrayBuffer to base64
+  arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  // Stop current audio playback
+  async stopAudio() {
+    if (this.currentSound) {
+      try {
+        await this.currentSound.stopAsync();
+        await this.currentSound.unloadAsync();
+      } catch (error) {
+        console.error('Error stopping audio:', error);
+      }
+      this.currentSound = null;
+    }
+  }
+
+  // Build prompt for spoken messages
+  buildSpokenPrompt(alarmData, snoozeCount) {
+    const {
+      purpose: alarmLabel,
+      useWakeUpVoice
+    } = alarmData;
+
+    const user = this.userProfile?.name || 'User';
+    const tone = this.userProfile?.tone || 'mid-delicate';
+    const goals = this.userProfile?.goals || 'No specific goals set';
+    const hobbies = this.userProfile?.hobbies || 'No hobbies specified';
+
+    let toneInstruction = '';
+    switch (tone) {
+      case 'delicate':
+        toneInstruction = 'Use a gentle, encouraging tone with soft language.';
+        break;
+      case 'mid-delicate':
+        toneInstruction = 'Use a balanced tone with some humor and encouragement.';
+        break;
+      case 'savage':
+        toneInstruction = 'Use a bold, sassy tone with humor and attitude.';
+        break;
+      default:
+        toneInstruction = 'Use a balanced, encouraging tone.';
+    }
+
+    return `Create a personalized, 20-30 second wake-up message for a user based on their profile:
+
+Name: ${user}
+Tone: ${tone} (choose from: delicate, mid-delicate, savage)
+Alarm label (reason for waking): '${alarmLabel}'
+Personal goals: ${goals}
+Hobbies or favorite interests: ${hobbies}
+Snooze count: ${snoozeCount} times
+
+Instructions:
+${toneInstruction}
+Keep it conversational and natural, approximately 2-3 sentences.
+Include their name and reference their alarm reason.
+Optionally mention their goals or hobbies if relevant.
+Make it engaging and motivational.
+Add relevant emojis for personality, but keep them minimal.
+
+The message should feel personal and motivating, encouraging them to get out of bed for their specific reason.`;
+  }
+
+  // Build prompt for singing messages
+  buildSingingPrompt(alarmData, snoozeCount) {
+    const {
+      purpose: alarmLabel,
+      useWakeUpVoice
+    } = alarmData;
+
+    const user = this.userProfile?.name || 'User';
+    const tone = this.userProfile?.tone || 'mid-delicate';
+    const goals = this.userProfile?.goals || 'No specific goals set';
+    const hobbies = this.userProfile?.hobbies || 'No hobbies specified';
+
+    let styleInstruction = '';
+    switch (tone) {
+      case 'delicate':
+        styleInstruction = 'soft melody, uplifting, calm';
+        break;
+      case 'mid-delicate':
+        styleInstruction = 'clever, teasing, supportive';
+        break;
+      case 'savage':
+        styleInstruction = 'energetic, sassy, comedic, bold';
+        break;
+      default:
+        styleInstruction = 'balanced, encouraging, fun';
+    }
+
+    return `Create a personalized, 30-second rhyming wake-up song for a user based on their profile:
+Name: ${user}
+Tone: ${tone} (choose from: delicate, mid-delicate, savage)
+Alarm label (reason for waking): '${alarmLabel}'
+Personal goals: ${goals}
+Hobbies or favorite interests: ${hobbies}
+Optional: Gender/pronouns: Not specified
+Snooze count: ${snoozeCount} times
+
+Instructions:
+The output should be a short lyrical song or jingle, formatted in stanzas.
+Keep it rhythmic and rhyming, approximately 4–8 lines to fill 25–35 seconds when sung.
+Style and vibe should match the user's tone:
+Delicate: soft melody, uplifting, calm
+Mid-Delicate: clever, teasing, supportive
+Savage: energetic, sassy, comedic, bold
+Include references to the user's goal and alarm reason.
+Optionally reflect their hobby in the style (e.g., pop star vibes if they like Beyoncé, anime if they like manga, etc.).
+Add relevant emojis for flair, but no spoken narration—only lyrics.`;
+  }
+
+  // Get fallback message when AI fails
+  getFallbackMessage(alarmData, snoozeCount) {
+    const { purpose: alarmLabel } = alarmData;
+    const user = this.userProfile?.name || 'User';
+    
+    if (snoozeCount >= 3) {
+      return `🎵 Rise and shine, ${user}! Your ${alarmLabel} is calling! 🎵`;
+    } else {
+      return `Good morning, ${user}! Time to wake up for ${alarmLabel}! 🌅`;
+    }
+  }
+
+  // Track snooze count for specific alarms
+  incrementSnoozeCount(alarmId) {
+    const currentCount = this.alarmHistory.get(alarmId) || 0;
+    this.alarmHistory.set(alarmId, currentCount + 1);
+    console.log(`⏰ Current snooze count: ${currentCount + 1}`);
+  }
+
+  getSnoozeCount(alarmId) {
+    return this.alarmHistory.get(alarmId) || 0;
+  }
+
+  resetSnoozeCount(alarmId) {
+    this.alarmHistory.delete(alarmId);
+  }
+
+  // Get user profile for external use
+  getUserProfile() {
+    return this.userProfile || {};
   }
 }
 

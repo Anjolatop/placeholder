@@ -1,259 +1,398 @@
+import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
-import * as Audio from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import AIVoiceService from './aiVoiceService';
 
 class VoiceService {
   constructor() {
-    this.isPlaying = false;
+    this.isInitialized = false;
     this.currentSound = null;
-    this.voiceQueue = [];
-    this.isProcessing = false;
+    this.isPlaying = false;
+    this.voicePersonas = [];
+    this.defaultVoiceId = 'default-voice-id';
   }
 
-  // Get voice configuration based on persona
-  getVoiceConfig(persona) {
-    const voiceConfigs = {
-      'nigerian-aunty': {
-        language: 'en-NG',
-        pitch: 1.2,
-        rate: 0.9,
-        voice: 'com.apple.ttsbundle.siri_female_en-NG_compact'
-      },
-      'wise-elder': {
-        language: 'en-GB',
-        pitch: 0.8,
-        rate: 0.7,
-        voice: 'com.apple.ttsbundle.Daniel-compact'
-      },
-      'zen-monk': {
-        language: 'ja-JP',
-        pitch: 0.9,
-        rate: 0.6,
-        voice: 'com.apple.ttsbundle.Kyoko-compact'
-      },
-      'study-buddy': {
-        language: 'en-US',
-        pitch: 1.1,
-        rate: 1.0,
-        voice: 'com.apple.ttsbundle.Samantha-compact'
-      },
-      'fitness-coach': {
-        language: 'en-AU',
-        pitch: 1.3,
-        rate: 1.1,
-        voice: 'com.apple.ttsbundle.Karen-compact'
-      },
-      'chef-inspiration': {
-        language: 'it-IT',
-        pitch: 1.0,
-        rate: 0.8,
-        voice: 'com.apple.ttsbundle.Alice-compact'
-      },
-      'tech-enthusiast': {
-        language: 'en-US',
-        pitch: 1.2,
-        rate: 1.2,
-        voice: 'com.apple.ttsbundle.Alex-compact'
-      },
-      'nature-guide': {
-        language: 'en-US',
-        pitch: 0.9,
-        rate: 0.7,
-        voice: 'com.apple.ttsbundle.Victoria-compact'
-      }
-    };
-
-    return voiceConfigs[persona] || voiceConfigs['nigerian-aunty'];
-  }
-
-  // Get available voices
-  async getAvailableVoices() {
+  async initialize() {
     try {
-      const voices = await Speech.getAvailableVoicesAsync();
-      console.log('🎤 Available voices:', voices.length);
-      return voices;
+      // Load voice personas
+      await this.loadVoicePersonas();
+      
+      // Initialize audio session
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        staysActiveInBackground: true,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+      });
+
+      this.isInitialized = true;
+      console.log('VoiceService initialized successfully');
     } catch (error) {
-      console.log('❌ Error getting voices:', error);
-      return [];
+      console.error('Error initializing VoiceService:', error);
     }
   }
 
-  // Speak text with persona-specific configuration
-  async speakWithPersona(text, persona, options = {}) {
-    if (this.isPlaying) {
-      console.log('🔇 Voice already playing, queuing message...');
-      this.voiceQueue.push({ text, persona, options });
-      return;
-    }
-
+  async loadVoicePersonas() {
     try {
-      this.isPlaying = true;
-      const voiceConfig = this.getVoiceConfig(persona);
-      
-      // Apply tone-based modifications
-      const toneModifications = this.getToneModifications(options.tone);
-      
+      const personasData = await AsyncStorage.getItem('voicePersonas');
+      if (personasData) {
+        this.voicePersonas = JSON.parse(personasData);
+      } else {
+        // Initialize with default personas
+        this.voicePersonas = this.getDefaultPersonas();
+        await AsyncStorage.setItem('voicePersonas', JSON.stringify(this.voicePersonas));
+      }
+    } catch (error) {
+      console.error('Error loading voice personas:', error);
+      this.voicePersonas = this.getDefaultPersonas();
+    }
+  }
+
+  getDefaultPersonas() {
+    return [
+      {
+        id: 'soft-singer',
+        name: 'Soft Singer',
+        description: 'Gentle, melodic voice for delicate messages',
+        tone: 'delicate',
+        style: 'soft-singer',
+        voiceId: 'soft-voice-id',
+        isUnlocked: true,
+        isDefault: true,
+      },
+      {
+        id: 'hype-mc',
+        name: 'Hype MC',
+        description: 'Energetic, motivational voice',
+        tone: 'savage',
+        style: 'hype-mc',
+        voiceId: 'hype-voice-id',
+        isUnlocked: true,
+        isDefault: false,
+      },
+      {
+        id: 'pop-diva',
+        name: 'Pop Diva',
+        description: 'Powerful, confident voice',
+        tone: 'mid-delicate',
+        style: 'pop-diva',
+        voiceId: 'diva-voice-id',
+        isUnlocked: true,
+        isDefault: false,
+      },
+      {
+        id: 'nigerian-aunty',
+        name: 'Nigerian Aunty',
+        description: 'Warm, caring voice with Nigerian accent',
+        tone: 'delicate',
+        style: 'nigerian-aunty',
+        voiceId: 'aunty-voice-id',
+        isUnlocked: false,
+        isDefault: false,
+      },
+      {
+        id: 'wise-elder',
+        name: 'Wise Elder',
+        description: 'Calm, wise voice for gentle guidance',
+        tone: 'delicate',
+        style: 'wise-elder',
+        voiceId: 'elder-voice-id',
+        isUnlocked: false,
+        isDefault: false,
+      },
+      {
+        id: 'comedic-jester',
+        name: 'Comedic Jester',
+        description: 'Funny, playful voice for humor',
+        tone: 'savage',
+        style: 'comedic-jester',
+        voiceId: 'jester-voice-id',
+        isUnlocked: false,
+        isDefault: false,
+      },
+    ];
+  }
+
+  async speakText(text, options = {}) {
+    try {
+      const {
+        voice = 'en-US',
+        rate = 0.8,
+        pitch = 1.0,
+        volume = 1.0,
+        onStart,
+        onDone,
+        onError,
+      } = options;
+
       const speechOptions = {
-        language: voiceConfig.language,
-        pitch: voiceConfig.pitch * toneModifications.pitch,
-        rate: voiceConfig.rate * toneModifications.rate,
-        volume: options.volume || 0.8,
-        onStart: () => {
-          console.log(`🎤 Started speaking: "${text}"`);
-          console.log(`👤 Persona: ${persona}`);
-          console.log(`🎭 Config: ${voiceConfig.language}, pitch: ${speechOptions.pitch}, rate: ${speechOptions.rate}`);
-        },
-        onDone: () => {
-          console.log(`✅ Finished speaking: "${text}"`);
-          this.isPlaying = false;
-          this.processQueue();
-        },
-        onError: (error) => {
-          console.log(`❌ Speech error:`, error);
-          this.isPlaying = false;
-          this.processQueue();
-        }
+        language: voice,
+        pitch: pitch,
+        rate: rate,
+        volume: volume,
       };
 
-      // Try to use specific voice if available
-      try {
-        const voices = await this.getAvailableVoices();
-        const matchingVoice = voices.find(v => v.identifier === voiceConfig.voice);
-        if (matchingVoice) {
-          speechOptions.voice = voiceConfig.voice;
-        }
-      } catch (error) {
-        console.log('⚠️ Using default voice configuration');
-      }
+      if (onStart) onStart();
 
       await Speech.speak(text, speechOptions);
-      
-    } catch (error) {
-      console.log('❌ Error in speakWithPersona:', error);
-      this.isPlaying = false;
-      this.processQueue();
-    }
-  }
 
-  // Get tone-based voice modifications
-  getToneModifications(tone) {
-    const modifications = {
-      'savage': {
-        pitch: 1.3,
-        rate: 1.2
-      },
-      'motivational': {
-        pitch: 1.1,
-        rate: 1.0
-      },
-      'gentle': {
-        pitch: 0.8,
-        rate: 0.7
-      },
-      'delicate': {
-        pitch: 0.7,
-        rate: 0.6
-      },
-      'mid-delicate': {
-        pitch: 0.9,
-        rate: 0.8
-      }
-    };
-
-    return modifications[tone] || modifications['motivational'];
-  }
-
-  // Process voice queue
-  async processQueue() {
-    if (this.voiceQueue.length > 0 && !this.isPlaying) {
-      const nextVoice = this.voiceQueue.shift();
-      await this.speakWithPersona(nextVoice.text, nextVoice.persona, nextVoice.options);
-    }
-  }
-
-  // Stop current speech
-  async stop() {
-    try {
-      await Speech.stop();
-      this.isPlaying = false;
-      this.voiceQueue = [];
-      console.log('🔇 Speech stopped');
-    } catch (error) {
-      console.log('❌ Error stopping speech:', error);
-    }
-  }
-
-  // Check if speech is supported
-  async isSupported() {
-    try {
-      const available = await Speech.isAvailableAsync();
-      console.log('🎤 Speech supported:', available);
-      return available;
-    } catch (error) {
-      console.log('❌ Error checking speech support:', error);
-      return false;
-    }
-  }
-
-  // Play alarm with AI voice
-  async playAlarmVoice(message, persona, tone, volume = 0.8) {
-    try {
-      // Add alarm-specific audio effects
-      await this.playAlarmSound();
-      
-      // Speak the message
-      await this.speakWithPersona(message, persona, {
-        tone,
-        volume,
-        alarm: true
+      // Listen for speech completion
+      Speech.addEventListener('onSpeechStart', () => {
+        this.isPlaying = true;
+        if (onStart) onStart();
       });
-      
+
+      Speech.addEventListener('onSpeechEnd', () => {
+        this.isPlaying = false;
+        if (onDone) onDone();
+      });
+
+      Speech.addEventListener('onSpeechError', (error) => {
+        this.isPlaying = false;
+        console.error('Speech error:', error);
+        if (onError) onError(error);
+      });
+
     } catch (error) {
-      console.log('❌ Error playing alarm voice:', error);
+      console.error('Error speaking text:', error);
+      if (options.onError) options.onError(error);
     }
   }
 
-  // Play alarm sound effect
-  async playAlarmSound() {
+  async playVoiceMessage(message, personaId) {
     try {
+      // Stop any currently playing audio
+      await this.stopAudio();
+
+      // Get voice persona
+      const persona = personaId 
+        ? this.voicePersonas.find(p => p.id === personaId)
+        : this.voicePersonas.find(p => p.isDefault);
+
+      if (!persona) {
+        throw new Error('No voice persona found');
+      }
+
+      // Generate audio using AI service
+      const audioUrl = await AIVoiceService.generateVoiceAudio(message, persona.voiceId);
+
+      // Play the audio
+      await this.playAudio(audioUrl);
+
+    } catch (error) {
+      console.error('Error playing voice message:', error);
+      
+      // Fallback to text-to-speech
+      await this.speakText(message.content, {
+        voice: 'en-US',
+        rate: 0.8,
+        pitch: 1.0,
+        volume: 1.0,
+      });
+    }
+  }
+
+  async playAudio(audioUrl) {
+    try {
+      // Create sound object
       const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/alarm-sound.mp3'), // You'll need to add this file
-        { shouldPlay: true, volume: 0.3 }
+        { uri: audioUrl },
+        { shouldPlay: true }
       );
-      
+
       this.currentSound = sound;
-      
+
+      // Set up audio status updates
       sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          sound.unloadAsync();
+        if (status.isLoaded) {
+          this.isPlaying = status.isPlaying;
+          
+          if (status.didJustFinish) {
+            this.isPlaying = false;
+            this.currentSound = null;
+          }
         }
       });
+
+      // Play the sound
+      await sound.playAsync();
+
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      throw error;
+    }
+  }
+
+  async stopAudio() {
+    try {
+      if (this.currentSound) {
+        await this.currentSound.stopAsync();
+        await this.currentSound.unloadAsync();
+        this.currentSound = null;
+      }
+      
+      this.isPlaying = false;
+    } catch (error) {
+      console.error('Error stopping audio:', error);
+    }
+  }
+
+  async pauseAudio() {
+    try {
+      if (this.currentSound && this.isPlaying) {
+        await this.currentSound.pauseAsync();
+        this.isPlaying = false;
+      }
+    } catch (error) {
+      console.error('Error pausing audio:', error);
+    }
+  }
+
+  async resumeAudio() {
+    try {
+      if (this.currentSound && !this.isPlaying) {
+        await this.currentSound.playAsync();
+        this.isPlaying = true;
+      }
+    } catch (error) {
+      console.error('Error resuming audio:', error);
+    }
+  }
+
+  async playSingingVoice(message, style) {
+    try {
+      // Generate singing voice using specialized models
+      const audioUrl = await AIVoiceService.generateSingingVoice(message, style);
+      
+      // Play the singing audio
+      await this.playAudio(audioUrl);
       
     } catch (error) {
-      console.log('⚠️ No alarm sound file found, continuing with voice only');
+      console.error('Error playing singing voice:', error);
+      
+      // Fallback to regular speech
+      await this.speakText(message.content, {
+        voice: 'en-US',
+        rate: 0.7, // Slower for singing-like effect
+        pitch: 1.1, // Slightly higher pitch
+        volume: 1.0,
+      });
     }
   }
 
-  // Test voice with different personas
-  async testVoice(persona, message, tone = 'motivational') {
-    console.log(`🧪 Testing voice for ${persona}: "${message}"`);
-    
-    const isSupported = await this.isSupported();
-    if (!isSupported) {
-      console.log('❌ Speech not supported on this device');
+  async previewVoicePersona(persona, sampleText) {
+    try {
+      const message = {
+        id: 'preview',
+        alarmId: 'preview',
+        type: 'spoken',
+        content: sampleText,
+        tone: persona.tone,
+        duration: 0,
+        createdAt: new Date(),
+      };
+
+      await this.playVoiceMessage(message, persona.id);
+      
+    } catch (error) {
+      console.error('Error previewing voice persona:', error);
+      
+      // Fallback to text-to-speech
+      await this.speakText(sampleText, {
+        voice: 'en-US',
+        rate: 0.8,
+        pitch: 1.0,
+        volume: 1.0,
+      });
+    }
+  }
+
+  async unlockVoicePersona(personaId) {
+    try {
+      const persona = this.voicePersonas.find(p => p.id === personaId);
+      if (persona) {
+        persona.isUnlocked = true;
+        await AsyncStorage.setItem('voicePersonas', JSON.stringify(this.voicePersonas));
+        console.log(`Voice persona unlocked: ${persona.name}`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error unlocking voice persona:', error);
       return false;
     }
-
-    await this.speakWithPersona(message, persona, { tone, volume: 0.8 });
-    return true;
   }
 
-  // Get voice status
-  getStatus() {
-    return {
-      isPlaying: this.isPlaying,
-      queueLength: this.voiceQueue.length,
-      currentSound: this.currentSound ? 'Playing' : 'None'
-    };
+  getVoicePersonas() {
+    return this.voicePersonas;
+  }
+
+  getUnlockedPersonas() {
+    return this.voicePersonas.filter(p => p.isUnlocked);
+  }
+
+  getPersonaById(personaId) {
+    return this.voicePersonas.find(p => p.id === personaId);
+  }
+
+  getPersonasByTone(tone) {
+    return this.voicePersonas.filter(p => p.tone === tone && p.isUnlocked);
+  }
+
+  // Getter methods
+  isInitialized() {
+    return this.isInitialized;
+  }
+
+  isCurrentlyPlaying() {
+    return this.isPlaying;
+  }
+
+  getCurrentSound() {
+    return this.currentSound;
+  }
+
+  // Test methods
+  async testVoiceGeneration(text) {
+    try {
+      const message = {
+        id: 'test',
+        alarmId: 'test',
+        type: 'spoken',
+        content: text,
+        tone: 'mid-delicate',
+        duration: 0,
+        createdAt: new Date(),
+      };
+
+      await this.playVoiceMessage(message);
+      return true;
+    } catch (error) {
+      console.error('Error testing voice generation:', error);
+      return false;
+    }
+  }
+
+  async testSingingGeneration(text, style = 'pop-diva') {
+    try {
+      const message = {
+        id: 'test-singing',
+        alarmId: 'test',
+        type: 'sung',
+        content: text,
+        tone: 'mid-delicate',
+        duration: 0,
+        createdAt: new Date(),
+      };
+
+      await this.playSingingVoice(message, style);
+      return true;
+    } catch (error) {
+      console.error('Error testing singing generation:', error);
+      return false;
+    }
   }
 }
 
