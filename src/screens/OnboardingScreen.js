@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../context/AppContext';
 import { COLORS, THEME } from '../constants/theme';
 
@@ -110,26 +112,115 @@ const OnboardingScreen = ({ navigation }) => {
     },
   ];
 
-  const hobbyOptions = [
-    'Reading', 'Gaming', 'Cooking', 'Fitness', 'Music', 'Art',
-    'Travel', 'Photography', 'Writing', 'Dancing', 'Yoga', 'Running',
-    'Swimming', 'Cycling', 'Hiking', 'Painting', 'Drawing', 'Crafting',
-    'Gardening', 'Knitting', 'Sewing', 'Woodworking', 'Pottery', 'Baking',
-    'Coffee', 'Tea', 'Wine', 'Beer', 'Cocktails', 'Cigars', 'Pipes',
-    'Anime', 'Manga', 'Comics', 'Movies', 'TV Shows', 'Podcasts',
-    'Puzzles', 'Board Games', 'Card Games', 'Chess', 'Poker', 'Bingo',
-    'Karaoke', 'Dancing', 'Singing', 'Acting', 'Stand-up', 'Magic',
-    'Juggling', 'Circus', 'Acrobatics', 'Parkour', 'Skateboarding',
-    'Surfing', 'Snowboarding', 'Skiing', 'Rock Climbing', 'Bouldering',
-    'Mountain Biking', 'Road Biking', 'Triathlon', 'Marathon', 'Ultra',
-    'Weightlifting', 'Powerlifting', 'CrossFit', 'Pilates', 'Barre',
-    'Ballet', 'Jazz', 'Hip Hop', 'Tap', 'Contemporary', 'Modern',
-    'Ballroom', 'Latin', 'Swing', 'Salsa', 'Bachata', 'Kizomba',
-    'Tango', 'Waltz', 'Foxtrot', 'Quickstep', 'Viennese Waltz',
-    'Cha Cha', 'Rumba', 'Samba', 'Paso Doble', 'Jive', 'East Coast Swing',
-    'West Coast Swing', 'Lindy Hop', 'Charleston', 'Shag', 'Balboa',
-    'Blues', 'Fusion', 'WCS', 'ECS', 'Lindy', 'Charleston', 'Shag',
-    'Balboa', 'Blues', 'Fusion', 'WCS', 'ECS', 'Lindy', 'Charleston',
+  // Improved hobbies with categories
+  const hobbyCategories = [
+    {
+      category: 'Sports & Fitness',
+      icon: 'fitness-center',
+      hobbies: [
+        'Running', 'Cycling', 'Swimming', 'Hiking', 'Yoga', 'Pilates',
+        'Weightlifting', 'CrossFit', 'Basketball', 'Soccer', 'Tennis',
+        'Golf', 'Volleyball', 'Badminton', 'Table Tennis', 'Rock Climbing',
+        'Bouldering', 'Surfing', 'Snowboarding', 'Skiing', 'Skateboarding',
+        'Parkour', 'Martial Arts', 'Boxing', 'Kickboxing', 'Jiu-Jitsu',
+        'Karate', 'Taekwondo', 'Wrestling', 'Gymnastics', 'Dance',
+        'Ballet', 'Jazz', 'Hip Hop', 'Contemporary', 'Ballroom',
+        'Salsa', 'Bachata', 'Swing', 'Tango', 'Waltz'
+      ]
+    },
+    {
+      category: 'Creative Arts',
+      icon: 'palette',
+      hobbies: [
+        'Painting', 'Drawing', 'Sketching', 'Digital Art', 'Photography',
+        'Videography', 'Sculpting', 'Pottery', 'Ceramics', 'Crafting',
+        'Knitting', 'Crocheting', 'Sewing', 'Embroidery', 'Quilting',
+        'Woodworking', 'Carpentry', 'Jewelry Making', 'Beading',
+        'Calligraphy', 'Typography', 'Graphic Design', 'Web Design',
+        'Animation', 'Film Making', 'Music Production', 'Songwriting',
+        'Playing Guitar', 'Playing Piano', 'Playing Drums', 'Singing',
+        'Acting', 'Stand-up Comedy', 'Magic', 'Juggling'
+      ]
+    },
+    {
+      category: 'Entertainment',
+      icon: 'movie',
+      hobbies: [
+        'Reading', 'Writing', 'Blogging', 'Journaling', 'Poetry',
+        'Gaming', 'Board Games', 'Card Games', 'Puzzles', 'Chess',
+        'Poker', 'Video Games', 'Mobile Games', 'PC Gaming',
+        'Console Gaming', 'VR Gaming', 'Watching Movies', 'TV Shows',
+        'Anime', 'Manga', 'Comics', 'Podcasts', 'Audiobooks',
+        'Karaoke', 'Dancing', 'Concerts', 'Theater', 'Museums',
+        'Art Galleries', 'Theme Parks', 'Escape Rooms', 'Arcades'
+      ]
+    },
+    {
+      category: 'Food & Drink',
+      icon: 'restaurant',
+      hobbies: [
+        'Cooking', 'Baking', 'Grilling', 'BBQ', 'Wine Tasting',
+        'Beer Brewing', 'Coffee Roasting', 'Tea Ceremony', 'Mixology',
+        'Cocktail Making', 'Food Photography', 'Recipe Development',
+        'Meal Planning', 'Fermentation', 'Pickling', 'Canning',
+        'Gardening', 'Herb Growing', 'Urban Farming', 'Foraging',
+        'Food Blogging', 'Restaurant Reviews', 'Food Tours',
+        'Cooking Classes', 'Wine Pairing', 'Cheese Tasting'
+      ]
+    },
+    {
+      category: 'Technology',
+      icon: 'computer',
+      hobbies: [
+        'Programming', 'Coding', 'Web Development', 'App Development',
+        'Game Development', 'Data Science', 'Machine Learning',
+        'AI/ML', 'Robotics', '3D Printing', 'Electronics', 'Arduino',
+        'Raspberry Pi', 'Drone Flying', 'Photography', 'Videography',
+        'Video Editing', 'Photo Editing', 'Graphic Design',
+        'UI/UX Design', 'Cybersecurity', 'Blockchain', 'Cryptocurrency',
+        'Virtual Reality', 'Augmented Reality', 'IoT Projects'
+      ]
+    },
+    {
+      category: 'Outdoor & Nature',
+      icon: 'nature',
+      hobbies: [
+        'Hiking', 'Camping', 'Backpacking', 'Rock Climbing', 'Mountain Biking',
+        'Bird Watching', 'Wildlife Photography', 'Nature Photography',
+        'Fishing', 'Hunting', 'Kayaking', 'Canoeing', 'Rafting',
+        'Sailing', 'Scuba Diving', 'Snorkeling', 'Beach Activities',
+        'Gardening', 'Urban Farming', 'Bonsai', 'Flower Arranging',
+        'Stargazing', 'Astronomy', 'Geocaching', 'Orienteering',
+        'Trail Running', 'Ultra Running', 'Triathlon', 'Adventure Racing'
+      ]
+    },
+    {
+      category: 'Learning & Education',
+      icon: 'school',
+      hobbies: [
+        'Learning Languages', 'Duolingo', 'Rosetta Stone', 'Online Courses',
+        'Coursera', 'Udemy', 'Khan Academy', 'TED Talks', 'Documentaries',
+        'History', 'Science', 'Philosophy', 'Psychology', 'Economics',
+        'Politics', 'Current Events', 'News Reading', 'Research',
+        'Academic Writing', 'Thesis Writing', 'Book Clubs', 'Debate',
+        'Public Speaking', 'Toastmasters', 'Teaching', 'Tutoring',
+        'Mentoring', 'Volunteering', 'Community Service'
+      ]
+    },
+    {
+      category: 'Lifestyle & Wellness',
+      icon: 'self-improvement',
+      hobbies: [
+        'Meditation', 'Mindfulness', 'Yoga', 'Tai Chi', 'Qigong',
+        'Breathing Exercises', 'Journaling', 'Gratitude Practice',
+        'Goal Setting', 'Habit Tracking', 'Productivity', 'Time Management',
+        'Minimalism', 'Decluttering', 'Organization', 'Planning',
+        'Bullet Journaling', 'Scrapbooking', 'Memory Keeping',
+        'Self-Care', 'Spa Activities', 'Massage', 'Aromatherapy',
+        'Essential Oils', 'Herbal Medicine', 'Natural Remedies',
+        'Fitness Tracking', 'Health Monitoring', 'Nutrition'
+      ]
+    }
   ];
 
   const goalOptions = [
@@ -176,7 +267,7 @@ const OnboardingScreen = ({ navigation }) => {
       case 'tone':
         return <ToneStep step={step} userData={userData} setUserData={setUserData} tones={tones} />;
       case 'hobbies':
-        return <HobbiesStep step={step} userData={userData} setUserData={setUserData} hobbyOptions={hobbyOptions} />;
+        return <HobbiesStep step={step} userData={userData} setUserData={setUserData} hobbyCategories={hobbyCategories} />;
       case 'goals':
         return <GoalsStep step={step} userData={userData} setUserData={setUserData} goalOptions={goalOptions} />;
       case 'voice':
@@ -246,7 +337,7 @@ const OnboardingScreen = ({ navigation }) => {
   const canProceed = () => {
     switch (steps[currentStep].component) {
       case 'name':
-        return userData.name.trim().length > 0;
+        return userData.name.trim().length >= 2;
       case 'hobbies':
         return userData.hobbies.length > 0;
       case 'goals':
@@ -325,19 +416,43 @@ const WelcomeStep = ({ step }) => (
   </View>
 );
 
-const NameStep = ({ step, userData, setUserData }) => (
-  <View style={styles.stepContainer}>
-    <Text style={styles.stepTitle}>{step.title}</Text>
-    <Text style={styles.stepSubtitle}>{step.subtitle}</Text>
-    <TextInput
-      style={styles.textInput}
-      value={userData.name}
-      onChangeText={(text) => setUserData({ ...userData, name: text })}
-      placeholder="Enter your name"
-      placeholderTextColor={COLORS.gray}
-    />
-  </View>
-);
+const NameStep = ({ step, userData, setUserData }) => {
+  const [isValid, setIsValid] = useState(true);
+
+  const handleNameChange = (text) => {
+    setUserData({ ...userData, name: text });
+    setIsValid(text.trim().length >= 2);
+  };
+
+  return (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>{step.title}</Text>
+      <Text style={styles.stepSubtitle}>{step.subtitle}</Text>
+      
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={[
+            styles.textInput,
+            !isValid && userData.name.length > 0 && styles.textInputError
+          ]}
+          value={userData.name}
+          onChangeText={handleNameChange}
+          placeholder="Enter your name"
+          placeholderTextColor={COLORS.gray}
+          autoFocus
+          autoCapitalize="words"
+          maxLength={50}
+        />
+        {!isValid && userData.name.length > 0 && (
+          <Text style={styles.errorText}>Name must be at least 2 characters</Text>
+        )}
+        {userData.name.length > 0 && isValid && (
+          <Text style={styles.successText}>✓ Great name!</Text>
+        )}
+      </View>
+    </View>
+  );
+};
 
 const ToneStep = ({ step, userData, setUserData, tones }) => (
   <View style={styles.stepContainer}>
@@ -362,71 +477,229 @@ const ToneStep = ({ step, userData, setUserData, tones }) => (
   </View>
 );
 
-const HobbiesStep = ({ step, userData, setUserData, hobbyOptions }) => (
-  <View style={styles.stepContainer}>
-    <Text style={styles.stepTitle}>{step.title}</Text>
-    <Text style={styles.stepSubtitle}>{step.subtitle}</Text>
-    <View style={styles.chipContainer}>
-      {hobbyOptions.slice(0, 20).map((hobby) => (
-        <TouchableOpacity
-          key={hobby}
-          style={[
-            styles.chip,
-            userData.hobbies.includes(hobby) && styles.chipSelected,
-          ]}
-          onPress={() => {
-            const updatedHobbies = userData.hobbies.includes(hobby)
-              ? userData.hobbies.filter((h) => h !== hobby)
-              : [...userData.hobbies, hobby];
-            setUserData({ ...userData, hobbies: updatedHobbies });
-          }}
-        >
-          <Text
-            style={[
-              styles.chipText,
-              userData.hobbies.includes(hobby) && styles.chipTextSelected,
-            ]}
-          >
-            {hobby}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  </View>
-);
+const HobbiesStep = ({ step, userData, setUserData, hobbyCategories }) => {
+  const [selectedCategory, setSelectedCategory] = useState(0);
+  const [searchText, setSearchText] = useState('');
+  const [customHobby, setCustomHobby] = useState('');
 
-const GoalsStep = ({ step, userData, setUserData, goalOptions }) => (
-  <View style={styles.stepContainer}>
-    <Text style={styles.stepTitle}>{step.title}</Text>
-    <Text style={styles.stepSubtitle}>{step.subtitle}</Text>
-    <View style={styles.chipContainer}>
-      {goalOptions.slice(0, 20).map((goal) => (
-        <TouchableOpacity
-          key={goal}
-          style={[
-            styles.chip,
-            userData.personalGoals.includes(goal) && styles.chipSelected,
-          ]}
-          onPress={() => {
-            const updatedGoals = userData.personalGoals.includes(goal)
-              ? userData.personalGoals.filter((g) => g !== goal)
-              : [...userData.personalGoals, goal];
-            setUserData({ ...userData, personalGoals: updatedGoals });
-          }}
-        >
-          <Text
-            style={[
-              styles.chipText,
-              userData.personalGoals.includes(goal) && styles.chipTextSelected,
-            ]}
-          >
-            {goal}
-          </Text>
-        </TouchableOpacity>
-      ))}
+  const handleHobbyToggle = (hobby) => {
+    const updatedHobbies = userData.hobbies.includes(hobby)
+      ? userData.hobbies.filter((h) => h !== hobby)
+      : [...userData.hobbies, hobby];
+    setUserData({ ...userData, hobbies: updatedHobbies });
+  };
+
+  const currentHobbies = hobbyCategories[selectedCategory]?.hobbies || [];
+  const filteredHobbies = currentHobbies.filter(hobby =>
+    hobby.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  return (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>{step.title}</Text>
+      <Text style={styles.stepSubtitle}>{step.subtitle}</Text>
+      
+      {/* Selected Hobbies Display */}
+      {userData.hobbies.length > 0 && (
+        <View style={styles.selectedHobbiesContainer}>
+          <Text style={styles.selectedHobbiesTitle}>Selected Hobbies:</Text>
+          <View style={styles.selectedHobbiesList}>
+            {userData.hobbies.map((hobby) => (
+              <TouchableOpacity
+                key={hobby}
+                style={styles.selectedHobbyChip}
+                onPress={() => handleHobbyToggle(hobby)}
+              >
+                <Text style={styles.selectedHobbyText}>{hobby}</Text>
+                <Icon name="close" size={16} color={COLORS.white} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Search Input */}
+      <View style={styles.searchContainer}>
+        <Icon name="search" size={20} color={COLORS.gray} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search hobbies..."
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholderTextColor={COLORS.gray}
+        />
+      </View>
+
+      {/* Category Tabs */}
+      <View style={styles.categoryTabsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {hobbyCategories.map((category, index) => (
+            <TouchableOpacity
+              key={category.category}
+              style={[
+                styles.categoryTab,
+                selectedCategory === index && styles.categoryTabActive,
+              ]}
+              onPress={() => setSelectedCategory(index)}
+            >
+              <Icon 
+                name={category.icon} 
+                size={20} 
+                color={selectedCategory === index ? COLORS.white : COLORS.gray} 
+              />
+              <Text style={[
+                styles.categoryTabText,
+                selectedCategory === index && styles.categoryTabTextActive,
+              ]}>
+                {category.category}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Hobbies List */}
+      <ScrollView style={styles.hobbiesListContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.hobbiesGrid}>
+          {filteredHobbies.map((hobby) => (
+            <TouchableOpacity
+              key={hobby}
+              style={[
+                styles.hobbyChip,
+                userData.hobbies.includes(hobby) && styles.hobbyChipSelected,
+              ]}
+              onPress={() => handleHobbyToggle(hobby)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.hobbyChipText,
+                  userData.hobbies.includes(hobby) && styles.hobbyChipTextSelected,
+                ]}
+              >
+                {hobby}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        
+        {/* Custom Hobby Input */}
+        <View style={styles.customHobbyContainer}>
+          <Text style={styles.customHobbyTitle}>Add your own hobby:</Text>
+          <View style={styles.customHobbyInputContainer}>
+            <TextInput
+              style={styles.customHobbyInput}
+              placeholder="Type a hobby and press +"
+              placeholderTextColor={COLORS.gray}
+              value={customHobby}
+              onChangeText={setCustomHobby}
+              onSubmitEditing={() => {
+                if (customHobby.trim() && !userData.hobbies.includes(customHobby.trim())) {
+                  handleHobbyToggle(customHobby.trim());
+                  setCustomHobby('');
+                }
+              }}
+            />
+            <TouchableOpacity
+              style={styles.addHobbyButton}
+              onPress={() => {
+                if (customHobby.trim() && !userData.hobbies.includes(customHobby.trim())) {
+                  handleHobbyToggle(customHobby.trim());
+                  setCustomHobby('');
+                }
+              }}
+            >
+              <Icon name="add" size={24} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
     </View>
-  </View>
-);
+  );
+};
+
+const GoalsStep = ({ step, userData, setUserData, goalOptions }) => {
+  const [searchText, setSearchText] = useState('');
+  
+  const filteredGoals = goalOptions.filter(goal =>
+    goal.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  const handleGoalToggle = (goal) => {
+    const updatedGoals = userData.personalGoals.includes(goal)
+      ? userData.personalGoals.filter((g) => g !== goal)
+      : [...userData.personalGoals, goal];
+    setUserData({ ...userData, personalGoals: updatedGoals });
+  };
+
+  return (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>{step.title}</Text>
+      <Text style={styles.stepSubtitle}>{step.subtitle}</Text>
+      
+      {/* Search Input */}
+      <View style={styles.searchContainer}>
+        <Icon name="search" size={20} color={COLORS.gray} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search goals..."
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholderTextColor={COLORS.gray}
+        />
+      </View>
+
+      {/* Selected Goals Display */}
+      {userData.personalGoals.length > 0 && (
+        <View style={styles.selectedGoalsContainer}>
+          <Text style={styles.selectedGoalsTitle}>Selected Goals:</Text>
+          <View style={styles.selectedGoalsList}>
+            {userData.personalGoals.map((goal) => (
+              <TouchableOpacity
+                key={goal}
+                style={styles.selectedGoalChip}
+                onPress={() => handleGoalToggle(goal)}
+              >
+                <Text style={styles.selectedGoalText}>{goal}</Text>
+                <Icon name="close" size={16} color={COLORS.white} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Goals Grid */}
+      <View style={styles.goalsGridContainer}>
+        <FlatList
+          data={filteredGoals}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.goalChip,
+                userData.personalGoals.includes(item) && styles.goalChipSelected,
+              ]}
+              onPress={() => handleGoalToggle(item)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.goalChipText,
+                  userData.personalGoals.includes(item) && styles.goalChipTextSelected,
+                ]}
+              >
+                {item}
+              </Text>
+            </TouchableOpacity>
+          )}
+          keyExtractor={(item) => item}
+          numColumns={2}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.goalsGrid}
+        />
+      </View>
+    </View>
+  );
+};
 
 const VoiceStep = ({ step, userData, setUserData, wakeStyles }) => (
   <View style={styles.stepContainer}>
@@ -515,6 +788,9 @@ const styles = StyleSheet.create({
     marginBottom: THEME.spacing.xl,
     lineHeight: THEME.typography.lineHeight.relaxed,
   },
+  inputContainer: {
+    width: '100%',
+  },
   textInput: {
     width: '100%',
     height: THEME.layout.inputHeight,
@@ -523,7 +799,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: THEME.spacing.md,
     fontSize: THEME.typography.fontSize.lg,
     color: COLORS.black,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
     ...THEME.shadows.sm,
+  },
+  textInputError: {
+    borderColor: '#ff6b6b',
+    borderWidth: 2,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: THEME.typography.fontSize.sm,
+    marginTop: THEME.spacing.xs,
+    marginLeft: THEME.spacing.sm,
+  },
+  successText: {
+    color: '#51cf66',
+    fontSize: THEME.typography.fontSize.sm,
+    marginTop: THEME.spacing.xs,
+    marginLeft: THEME.spacing.sm,
+    fontWeight: 'bold',
   },
   optionsContainer: {
     width: '100%',
@@ -553,11 +848,221 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     textAlign: 'center',
   },
-  chipContainer: {
+  // Selected Hobbies/Goals Display
+  selectedHobbiesContainer: {
+    marginBottom: THEME.spacing.lg,
+  },
+  selectedHobbiesTitle: {
+    fontSize: THEME.typography.fontSize.lg,
+    fontWeight: 'bold',
+    color: COLORS.forestGreen,
+    marginBottom: THEME.spacing.sm,
+  },
+  selectedHobbiesList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: THEME.spacing.sm,
+  },
+  selectedHobbyChip: {
+    backgroundColor: COLORS.accentBurntOrange,
+    borderRadius: THEME.borderRadius.full,
+    paddingHorizontal: THEME.spacing.md,
+    paddingVertical: THEME.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: THEME.spacing.xs,
+  },
+  selectedHobbyText: {
+    color: COLORS.white,
+    fontSize: THEME.typography.fontSize.sm,
+    fontWeight: 'bold',
+  },
+  selectedGoalsContainer: {
+    marginBottom: THEME.spacing.lg,
+  },
+  selectedGoalsTitle: {
+    fontSize: THEME.typography.fontSize.lg,
+    fontWeight: 'bold',
+    color: COLORS.forestGreen,
+    marginBottom: THEME.spacing.sm,
+  },
+  selectedGoalsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: THEME.spacing.sm,
+  },
+  selectedGoalChip: {
+    backgroundColor: COLORS.accentBurntOrange,
+    borderRadius: THEME.borderRadius.full,
+    paddingHorizontal: THEME.spacing.md,
+    paddingVertical: THEME.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: THEME.spacing.xs,
+  },
+  selectedGoalText: {
+    color: COLORS.white,
+    fontSize: THEME.typography.fontSize.sm,
+    fontWeight: 'bold',
+  },
+
+  // Category Tabs
+  categoryTabsContainer: {
+    marginBottom: THEME.spacing.lg,
+  },
+  categoryTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: THEME.borderRadius.lg,
+    paddingHorizontal: THEME.spacing.md,
+    paddingVertical: THEME.spacing.sm,
+    marginRight: THEME.spacing.sm,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  categoryTabActive: {
+    backgroundColor: COLORS.accentBurntOrange,
+    borderColor: COLORS.accentBurntOrange,
+  },
+  categoryTabText: {
+    fontSize: THEME.typography.fontSize.sm,
+    color: COLORS.gray,
+    marginLeft: THEME.spacing.xs,
+  },
+  categoryTabTextActive: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+
+  // Search
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: THEME.borderRadius.lg,
+    paddingHorizontal: THEME.spacing.md,
+    marginBottom: THEME.spacing.lg,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  searchIcon: {
+    marginRight: THEME.spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: THEME.typography.fontSize.lg,
+    color: COLORS.black,
+    paddingVertical: THEME.spacing.md,
+  },
+
+  // Hobbies List Container
+  hobbiesListContainer: {
+    flex: 1,
+    marginTop: THEME.spacing.md,
+  },
+  hobbiesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: THEME.spacing.lg,
+  },
+  goalsGridContainer: {
+    flex: 1,
+  },
+  goalsGrid: {
+    paddingBottom: THEME.spacing.lg,
+  },
+
+  // Hobby and Goal Chips
+  hobbyChip: {
+    backgroundColor: COLORS.white,
+    borderRadius: THEME.borderRadius.lg,
+    paddingHorizontal: THEME.spacing.md,
+    paddingVertical: THEME.spacing.sm,
+    margin: THEME.spacing.xs,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    width: '48%',
+    minHeight: 44,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hobbyChipSelected: {
+    backgroundColor: COLORS.accentBurntOrange,
+    borderColor: COLORS.accentBurntOrange,
+  },
+  hobbyChipText: {
+    fontSize: THEME.typography.fontSize.sm,
+    color: COLORS.gray,
+    textAlign: 'center',
+  },
+  hobbyChipTextSelected: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+  goalChip: {
+    backgroundColor: COLORS.white,
+    borderRadius: THEME.borderRadius.lg,
+    paddingHorizontal: THEME.spacing.md,
+    paddingVertical: THEME.spacing.sm,
+    margin: THEME.spacing.xs,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  goalChipSelected: {
+    backgroundColor: COLORS.accentBurntOrange,
+    borderColor: COLORS.accentBurntOrange,
+  },
+  goalChipText: {
+    fontSize: THEME.typography.fontSize.sm,
+    color: COLORS.gray,
+    textAlign: 'center',
+  },
+  goalChipTextSelected: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+
+  // Custom Hobby Input
+  customHobbyContainer: {
+    marginTop: THEME.spacing.lg,
+    paddingHorizontal: THEME.spacing.md,
+  },
+  customHobbyTitle: {
+    fontSize: THEME.typography.fontSize.lg,
+    fontWeight: 'bold',
+    color: COLORS.forestGreen,
+    marginBottom: THEME.spacing.sm,
+  },
+  customHobbyInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: THEME.spacing.sm,
+  },
+  customHobbyInput: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderRadius: THEME.borderRadius.lg,
+    paddingHorizontal: THEME.spacing.md,
+    paddingVertical: THEME.spacing.md,
+    fontSize: THEME.typography.fontSize.lg,
+    color: COLORS.black,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  addHobbyButton: {
+    backgroundColor: COLORS.accentBurntOrange,
+    borderRadius: THEME.borderRadius.lg,
+    padding: THEME.spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 50,
+    minHeight: 50,
   },
   chip: {
     backgroundColor: COLORS.white,
@@ -566,6 +1071,7 @@ const styles = StyleSheet.create({
     paddingVertical: THEME.spacing.sm,
     borderWidth: 1,
     borderColor: COLORS.lightGray,
+    marginRight: THEME.spacing.sm, // Add some margin for horizontal scroll
   },
   chipSelected: {
     backgroundColor: COLORS.accentBurntOrange,
