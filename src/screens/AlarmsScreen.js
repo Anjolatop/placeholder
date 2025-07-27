@@ -125,7 +125,19 @@ export default function AlarmsScreen() {
     { id: 'pushups', title: 'Push-ups', icon: '💪', desc: 'Complete push-ups to get moving', types: [5, 10, 20] },
     { id: 'squats', title: 'Squats', icon: '🦵', desc: 'Complete squats to energize', types: [10, 20, 30] },
     { id: 'reading', title: 'Read Pages', icon: '📖', desc: 'Read book pages to focus mind', types: [5, 10, 20] },
-    { id: 'meditation', title: 'Meditate', icon: '🧘‍♀️', desc: 'Meditation to center yourself', types: [2, 5, 10] }
+    { id: 'meditation', title: 'Meditate', icon: '🧘‍♀️', desc: 'Meditation to center yourself', types: [2, 5, 10] },
+    { id: 'planks', title: 'Planks', icon: '🏃‍♂️', desc: 'Hold plank position to build core', types: [30, 60, 90] },
+    { id: 'jumping', title: 'Jumping Jacks', icon: '🦘', desc: 'Do jumping jacks to get blood flowing', types: [10, 20, 50] },
+    { id: 'breathing', title: 'Deep Breathing', icon: '🫁', desc: 'Practice deep breathing exercises', types: [5, 10, 15] },
+    { id: 'writing', title: 'Write Goals', icon: '✍️', desc: 'Write down your daily goals', types: [3, 5, 10] },
+    { id: 'stretching', title: 'Stretching', icon: '🧘', desc: 'Do morning stretches to wake up', types: [5, 10, 15] },
+    { id: 'cold-shower', title: 'Cold Shower', icon: '🚿', desc: 'Take a cold shower to energize', types: [30, 60, 90] },
+    { id: 'vitamins', title: 'Take Vitamins', icon: '💊', desc: 'Take your daily vitamins', types: [1, 2, 3] },
+    { id: 'gratitude', title: 'Gratitude Journal', icon: '🙏', desc: 'Write 3 things you\'re grateful for', types: [3, 5, 7] },
+    { id: 'affirmations', title: 'Say Affirmations', icon: '💭', desc: 'Repeat positive affirmations', types: [3, 5, 10] },
+    { id: 'dance', title: 'Dance Moves', icon: '💃', desc: 'Do some dance moves to wake up', types: [1, 2, 3] },
+    { id: 'yoga', title: 'Yoga Poses', icon: '🧘‍♂️', desc: 'Complete yoga poses to center yourself', types: [3, 5, 7] },
+    { id: 'memory', title: 'Memory Game', icon: '🧠', desc: 'Play a memory game to activate brain', types: [3, 5, 10] }
   ];
 
   // AI Voice Messages based on goals and tone with persona integration
@@ -944,6 +956,102 @@ export default function AlarmsScreen() {
           </View>
         );
 
+      case 'pushups':
+      case 'squats':
+      case 'planks':
+      case 'jumping':
+      case 'breathing':
+      case 'reading':
+      case 'meditation':
+      case 'writing':
+      case 'stretching':
+      case 'cold-shower':
+      case 'vitamins':
+      case 'gratitude':
+      case 'affirmations':
+      case 'dance':
+      case 'yoga':
+      case 'memory':
+        return (
+          <View style={styles.taskCompletionContainer}>
+            <Text style={styles.taskCompletionTitle}>{task.title}</Text>
+            <Text style={styles.taskCompletionSubtitle}>
+              Complete {task.target} {task.type === 'pushups' ? 'push-ups' : 
+                task.type === 'squats' ? 'squats' :
+                task.type === 'planks' ? 'seconds of planks' :
+                task.type === 'jumping' ? 'jumping jacks' :
+                task.type === 'breathing' ? 'breathing cycles' :
+                task.type === 'reading' ? 'pages' :
+                task.type === 'meditation' ? 'minutes of meditation' :
+                task.type === 'writing' ? 'goals' :
+                task.type === 'stretching' ? 'stretches' :
+                task.type === 'cold-shower' ? 'seconds of cold shower' :
+                task.type === 'vitamins' ? 'vitamins' :
+                task.type === 'gratitude' ? 'gratitude items' :
+                task.type === 'affirmations' ? 'affirmations' :
+                task.type === 'dance' ? 'dance moves' :
+                task.type === 'yoga' ? 'yoga poses' :
+                task.type === 'memory' ? 'memory games' : 'items'}
+            </Text>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View 
+                  style={[
+                    styles.progressFill, 
+                    { width: `${Math.min((taskProgress[task.id] || 0) / task.target * 100, 100)}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {taskProgress[task.id] || 0} / {task.target} {task.type === 'pushups' ? 'push-ups' : 
+                  task.type === 'squats' ? 'squats' :
+                  task.type === 'planks' ? 'seconds' :
+                  task.type === 'jumping' ? 'jumping jacks' :
+                  task.type === 'breathing' ? 'cycles' :
+                  task.type === 'reading' ? 'pages' :
+                  task.type === 'meditation' ? 'minutes' :
+                  task.type === 'writing' ? 'goals' :
+                  task.type === 'stretching' ? 'stretches' :
+                  task.type === 'cold-shower' ? 'seconds' :
+                  task.type === 'vitamins' ? 'vitamins' :
+                  task.type === 'gratitude' ? 'items' :
+                  task.type === 'affirmations' ? 'affirmations' :
+                  task.type === 'dance' ? 'moves' :
+                  task.type === 'yoga' ? 'poses' :
+                  task.type === 'memory' ? 'games' : 'items'}
+              </Text>
+            </View>
+            <View style={styles.stepButtons}>
+              <TouchableOpacity 
+                style={styles.stepButton}
+                onPress={() => updateTaskProgress(task.id, (taskProgress[task.id] || 0) + 1)}
+              >
+                <Text style={styles.stepButtonText}>+1</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.stepButton}
+                onPress={() => updateTaskProgress(task.id, (taskProgress[task.id] || 0) + 2)}
+              >
+                <Text style={styles.stepButtonText}>+2</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.stepButton}
+                onPress={() => updateTaskProgress(task.id, (taskProgress[task.id] || 0) + 5)}
+              >
+                <Text style={styles.stepButtonText}>+5</Text>
+              </TouchableOpacity>
+            </View>
+            {(taskProgress[task.id] || 0) >= task.target && (
+              <TouchableOpacity 
+                style={styles.completeTaskButton}
+                onPress={() => completeTask(task.id)}
+              >
+                <Text style={styles.completeTaskButtonText}>Complete Task</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+
       default:
         return (
           <View style={styles.taskCompletionContainer}>
@@ -1127,7 +1235,11 @@ export default function AlarmsScreen() {
       {/* Add Alarm Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <ScrollView 
+            style={styles.modalContent}
+            contentContainerStyle={styles.modalContentScroll}
+            showsVerticalScrollIndicator={true}
+          >
             <Text style={styles.modalTitle}>Add New Alarm</Text>
             
             <View style={styles.inputGroup}>
@@ -1270,14 +1382,18 @@ export default function AlarmsScreen() {
                 <Text style={styles.saveButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 
       {/* Edit Alarm Modal */}
       <Modal visible={showEditModal} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <ScrollView 
+            style={styles.modalContent}
+            contentContainerStyle={styles.modalContentScroll}
+            showsVerticalScrollIndicator={true}
+          >
             <Text style={styles.modalTitle}>Edit Alarm</Text>
             
             <View style={styles.inputGroup}>
@@ -1446,7 +1562,7 @@ export default function AlarmsScreen() {
                 <Text style={styles.saveButtonText}>Update</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -1995,9 +2111,12 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 25,
     width: '90%',
-    maxHeight: '85%',
-    alignItems: 'center',
+    maxHeight: '80%',
     zIndex: 1001,
+  },
+  modalContentScroll: {
+    alignItems: 'center',
+    paddingBottom: 20,
   },
   modalTitle: {
     fontSize: 22,
@@ -2257,7 +2376,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   taskSelectionContainer: {
-    maxHeight: 300,
+    maxHeight: 250,
     width: '100%',
     marginBottom: 15,
   },
@@ -2266,11 +2385,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   taskSelectionItem: {
-    marginBottom: 15,
-    padding: 15,
+    marginBottom: 12,
+    padding: 12,
     backgroundColor: '#f8f8f8',
     borderRadius: 10,
-    minHeight: 60,
+    minHeight: 55,
+    width: '100%',
   },
   taskSelectionItemAdded: {
     backgroundColor: '#e8f5e8',
@@ -2322,7 +2442,7 @@ const styles = StyleSheet.create({
   },
   // Task configuration modal styles
   taskConfigContainer: {
-    maxHeight: 250,
+    maxHeight: 200,
     width: '100%',
     marginBottom: 15,
   },
@@ -2367,7 +2487,7 @@ const styles = StyleSheet.create({
   taskCompletionContainer: {
     width: '100%',
     marginBottom: 20,
-    maxHeight: 300,
+    maxHeight: 250,
   },
   taskCompletionContent: {
     alignItems: 'center',
