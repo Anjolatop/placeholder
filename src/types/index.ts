@@ -8,6 +8,8 @@ export interface UserProfile {
   hobbies: string[];
   personalGoals: string[];
   wakeStylePreference: 'spoken' | 'sung' | 'mixed';
+  preferredVoiceMood: 'soft-singer' | 'hype-mc' | 'comedic-jester' | 'pop-diva';
+  musicPreferences: string[]; // e.g., ['Beyoncé', 'Pop', 'R&B']
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,7 +28,9 @@ export interface Alarm {
   maxSnoozes: number;
   useWakeUpVoice: boolean;
   includeSinging: boolean;
+  voiceMoodOverride?: 'soft-singer' | 'hype-mc' | 'comedic-jester' | 'pop-diva';
   tone: 'delicate' | 'mid-delicate' | 'savage';
+  challengeModeEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,10 +41,22 @@ export interface VoiceMessage {
   alarmId: string;
   type: 'spoken' | 'sung' | 'mixed';
   content: string;
+  lyrics?: string; // For sung messages
+  melody?: string; // Musical notation or style description
   tone: 'delicate' | 'mid-delicate' | 'savage';
+  mood: 'soft-singer' | 'hype-mc' | 'comedic-jester' | 'pop-diva';
   audioUrl?: string;
   duration: number; // seconds
+  isGenerated: boolean;
   createdAt: Date;
+}
+
+export interface SongStructure {
+  greeting: string;
+  coreMessage: string;
+  goalReminder: string;
+  closureLine: string;
+  musicStyle: 'nursery-remix' | 'rap-hype' | 'comedic-jingle' | 'gentle-lullaby' | 'pop-anthem' | 'r&b-smooth';
 }
 
 export interface VoicePersona {
@@ -52,6 +68,10 @@ export interface VoicePersona {
   voiceId: string; // ElevenLabs voice ID
   isUnlocked: boolean;
   isDefault: boolean;
+  unlockRequirement?: {
+    type: 'streak' | 'level' | 'achievement';
+    value: number | string;
+  };
 }
 
 // Alarm History Types
@@ -64,8 +84,11 @@ export interface AlarmHistory {
   snoozeCount: number;
   wasSkipped: boolean;
   voiceMessageId?: string;
+  voiceMessageType?: 'spoken' | 'sung' | 'mixed';
   challengeCompleted?: boolean;
   challengeObject?: string;
+  challengeAttempts?: number;
+  wasInstantWake: boolean; // Woke up within 30 seconds
   createdAt: Date;
 }
 
@@ -78,7 +101,24 @@ export interface ChallengeMode {
   isCompleted: boolean;
   completedAt?: Date;
   imageUrl?: string;
+  attempts: ChallengeAttempt[];
   createdAt: Date;
+}
+
+export interface ChallengeAttempt {
+  id: string;
+  imageUrl: string;
+  detectedObjects: string[];
+  isCorrect: boolean;
+  confidence: number;
+  timestamp: Date;
+}
+
+export interface ChallengeObject {
+  name: string;
+  alternatives: string[]; // Alternative names for the object
+  description: string;
+  detectionKeywords: string[];
 }
 
 // Gamification Types
@@ -90,10 +130,14 @@ export interface UserStats {
   longestStreak: number;
   totalSnoozes: number;
   totalSkips: number;
+  instantWakes: number; // Woke up within 30 seconds
+  songsHeard: number;
+  challengesCompleted: number;
   averageWakeTime: number; // minutes after scheduled time
   achievements: Achievement[];
   level: number;
   experience: number;
+  unlockedVoicePersonas: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -106,6 +150,10 @@ export interface Achievement {
   isUnlocked: boolean;
   unlockedAt?: Date;
   category: 'streak' | 'wake-time' | 'challenge' | 'voice' | 'social';
+  reward?: {
+    type: 'voice-persona' | 'experience' | 'title';
+    value: string | number;
+  };
 }
 
 // AI Generation Types
@@ -120,6 +168,8 @@ export interface AIGenerationRequest {
     previousMessages: VoiceMessage[];
     timeOfDay: 'morning' | 'noon' | 'evening' | 'night';
     dayOfWeek: number;
+    recentBehavior: 'punctual' | 'snooze-heavy' | 'skip-prone';
+    consecutiveSkips: number;
   };
 }
 
@@ -130,6 +180,8 @@ export interface AIGenerationResponse {
   style: string;
   estimatedDuration: number;
   emotion: 'encouraging' | 'sarcastic' | 'funny' | 'gentle' | 'hype';
+  songStructure?: SongStructure;
+  shouldTriggerChallenge: boolean;
 }
 
 // Navigation Types
@@ -142,6 +194,8 @@ export type RootStackParamList = {
   Achievements: undefined;
   VoicePreview: { messageId: string };
   ChallengeMode: { alarmHistoryId: string };
+  VoicePersonaSelection: undefined;
+  SingingPreview: { voicePersona: string; sampleText: string };
 };
 
 export type MainTabParamList = {
@@ -159,6 +213,7 @@ export interface AppState {
   isAlarmActive: boolean;
   isChallengeMode: boolean;
   userStats: UserStats | null;
+  unlockedVoicePersonas: VoicePersona[];
   isLoading: boolean;
   error: string | null;
 }
@@ -173,13 +228,15 @@ export interface APIResponse<T> {
 
 // Voice Generation Types
 export interface VoiceGenerationConfig {
-  provider: 'elevenlabs' | 'azure' | 'google' | 'bark';
+  provider: 'elevenlabs' | 'azure' | 'google' | 'bark' | 'voicemod';
   voiceId: string;
   model: string;
   stability: number;
   similarityBoost: number;
   style: number;
   useSpeakerBoost: boolean;
+  isMusic: boolean; // For singing voices
+  musicStyle?: 'pop' | 'r&b' | 'rap' | 'lullaby' | 'jingle';
 }
 
 // Notification Types
@@ -194,13 +251,39 @@ export interface NotificationConfig {
   scheduledTime: Date;
 }
 
+// Music and Singing Types
+export interface MusicTemplate {
+  id: string;
+  name: string;
+  style: 'nursery-remix' | 'rap-hype' | 'comedic-jingle' | 'gentle-lullaby' | 'pop-anthem' | 'r&b-smooth';
+  tempo: 'slow' | 'medium' | 'fast';
+  mood: 'uplifting' | 'energetic' | 'calming' | 'motivational' | 'humorous';
+  structure: {
+    intro: string;
+    verse: string;
+    chorus: string;
+    outro: string;
+  };
+  sampleLyrics: string;
+}
+
+export interface BehavioralTrigger {
+  condition: 'consecutive_snoozes' | 'instant_wake' | 'skip_streak' | 'weekend_mode' | 'goal_reminder';
+  threshold: number;
+  action: 'dramatic_song' | 'victory_jingle' | 'guilt_trip_song' | 'gentle_reminder' | 'hype_anthem';
+  messageOverride?: string;
+}
+
 export default {
   UserProfile,
   Alarm,
   VoiceMessage,
+  SongStructure,
   VoicePersona,
   AlarmHistory,
   ChallengeMode,
+  ChallengeAttempt,
+  ChallengeObject,
   UserStats,
   Achievement,
   AIGenerationRequest,
@@ -211,4 +294,6 @@ export default {
   APIResponse,
   VoiceGenerationConfig,
   NotificationConfig,
+  MusicTemplate,
+  BehavioralTrigger,
 }; 
