@@ -1525,8 +1525,11 @@ export default function AlarmsScreen() {
               <TouchableOpacity
                 style={styles.addTaskButton}
                 onPress={() => {
+                  console.log('Add task button pressed');
                   setShowTaskModal(true);
                 }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Text style={styles.addTaskButtonText}>Add Tasks</Text>
               </TouchableOpacity>
@@ -1672,6 +1675,7 @@ export default function AlarmsScreen() {
 
       {/* Task Selection Modal */}
       <Modal visible={showTaskModal && !showTaskConfigModal} animationType="slide" transparent={true}>
+        {console.log('Task modal visible:', showTaskModal && !showTaskConfigModal)}
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Tasks</Text>
@@ -2287,6 +2291,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
     alignSelf: 'flex-start',
+    zIndex: 10,
   },
   addTaskButtonText: {
     color: '#ffffff',
