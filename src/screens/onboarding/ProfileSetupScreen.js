@@ -18,7 +18,7 @@ export default function ProfileSetupScreen({ navigation }) {
   // User data state
   const [userData, setUserData] = useState({
     name: '',
-    preferredTone: 'mid-delicate',
+    preferredTones: ['mid-delicate'], // Changed to array for multiple selections
     gender: '',
     hobbies: [],
     personalGoals: [],
@@ -27,15 +27,15 @@ export default function ProfileSetupScreen({ navigation }) {
 
   const steps = [
     {
-      title: "What's your name?",
-      subtitle: "We'll use this for personalized messages",
+      title: "Hi there, welcome to your new world of better habits, I'm your assistant!",
+      subtitle: "What name would you like me to call you, a nickname works too!",
       field: 'name',
       type: 'text'
     },
     {
-      title: "Choose your tone preference",
-      subtitle: "How should we motivate you?",
-      field: 'preferredTone',
+      title: "Choose your tone preferences",
+      subtitle: "Pick up to 2 tones that motivate you best",
+      field: 'preferredTones',
       type: 'tone'
     },
     {
@@ -106,7 +106,8 @@ export default function ProfileSetupScreen({ navigation }) {
           ...userData,
           onboardingCompleted: true
         });
-        // Navigation will be handled by auth state change
+        // Navigate to completion screen
+        navigation.navigate('SetupComplete', { userName: userData.name });
       }
     } catch (error) {
       Alert.alert('Error', error.message);
@@ -139,20 +140,43 @@ export default function ProfileSetupScreen({ navigation }) {
       case 'tone':
         return (
           <View style={styles.optionsContainer}>
-            {tones.map((tone) => (
-              <TouchableOpacity
-                key={tone.key}
-                style={[
-                  styles.optionCard,
-                  userData.preferredTone === tone.key && styles.selectedOption
-                ]}
-                onPress={() => updateUserData('preferredTone', tone.key)}
-              >
-                <Text style={styles.optionEmoji}>{tone.emoji}</Text>
-                <Text style={styles.optionLabel}>{tone.label}</Text>
-                <Text style={styles.optionDescription}>{tone.description}</Text>
-              </TouchableOpacity>
-            ))}
+            {tones.map((tone) => {
+              const isSelected = userData.preferredTones.includes(tone.key);
+              const canSelect = isSelected || userData.preferredTones.length < 2;
+              
+              return (
+                <TouchableOpacity
+                  key={tone.key}
+                  style={[
+                    styles.optionCard,
+                    isSelected && styles.selectedOption,
+                    !canSelect && styles.disabledOption
+                  ]}
+                  onPress={() => {
+                    if (isSelected) {
+                      // Remove if already selected
+                      updateUserData('preferredTones', 
+                        userData.preferredTones.filter(t => t !== tone.key)
+                      );
+                    } else if (canSelect) {
+                      // Add if not selected and under limit
+                      updateUserData('preferredTones', 
+                        [...userData.preferredTones, tone.key]
+                      );
+                    }
+                  }}
+                  disabled={!canSelect}
+                >
+                  <Text style={styles.optionEmoji}>{tone.emoji}</Text>
+                  <Text style={styles.optionLabel}>{tone.label}</Text>
+                  <Text style={styles.optionDescription}>{tone.description}</Text>
+                  {isSelected && <Text style={styles.selectedIndicator}>✓</Text>}
+                </TouchableOpacity>
+              );
+            })}
+            <Text style={styles.hint}>
+              Selected: {userData.preferredTones.length}/2
+            </Text>
           </View>
         );
 
@@ -175,12 +199,32 @@ export default function ProfileSetupScreen({ navigation }) {
             <TextInput
               style={[styles.textInput, styles.multilineInput]}
               value={userData.hobbies.join(', ')}
-              onChangeText={(text) => updateUserData('hobbies', text.split(',').map(h => h.trim()).filter(h => h))}
+              onChangeText={(text) => {
+                // Split by comma and clean up each hobby
+                const hobbiesArray = text
+                  .split(',')
+                  .map(hobby => hobby.trim())
+                  .filter(hobby => hobby.length > 0);
+                updateUserData('hobbies', hobbiesArray);
+              }}
               placeholder="e.g., reading, gym, cooking, gaming"
               multiline
               numberOfLines={3}
+              autoCapitalize="words"
             />
             <Text style={styles.hint}>Separate hobbies with commas</Text>
+            {userData.hobbies.length > 0 && (
+              <View style={styles.hobbiesPreview}>
+                <Text style={styles.hint}>Your hobbies:</Text>
+                <View style={styles.hobbiesList}>
+                  {userData.hobbies.map((hobby, index) => (
+                    <View key={index} style={styles.hobbyTag}>
+                      <Text style={styles.hobbyText}>{hobby}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
         );
 
@@ -253,7 +297,12 @@ export default function ProfileSetupScreen({ navigation }) {
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>{steps[currentStep].title}</Text>
+        <Text style={[
+          styles.title,
+          currentStep === 0 && { fontSize: 22, lineHeight: 28 } // Smaller font for welcome message
+        ]}>
+          {steps[currentStep].title}
+        </Text>
         <Text style={styles.subtitle}>{steps[currentStep].subtitle}</Text>
         
         {renderStep()}
@@ -366,6 +415,11 @@ const styles = StyleSheet.create({
     borderColor: '#55786f',
     backgroundColor: '#f8f9fa',
   },
+  disabledOption: {
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f5f5f5',
+    opacity: 0.6,
+  },
   optionEmoji: {
     fontSize: 32,
     textAlign: 'center',
@@ -382,6 +436,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    fontSize: 20,
+    color: '#55786f',
+    fontWeight: 'bold',
+  },
+  hobbiesPreview: {
+    marginTop: 15,
+  },
+  hobbiesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 5,
+  },
+  hobbyTag: {
+    backgroundColor: '#e07a5f',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  hobbyText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   footer: {
     padding: 30,

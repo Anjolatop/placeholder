@@ -12,10 +12,33 @@ export default function WelcomeScreen({ navigation }) {
 
       {/* Main Content */}
       <View style={styles.content}>
-        <View style={styles.illustration}>
-          <Text style={styles.emoji}>⏰</Text>
-          <Text style={styles.emoji}>🎤</Text>
-          <Text style={styles.emoji}>🎵</Text>
+        {/* Clock Logo */}
+        <View style={styles.logoContainer}>
+          <View style={styles.clockLogo}>
+            <View style={styles.clockFace}>
+              {/* Clock hour markers */}
+              {[...Array(12)].map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.hourMarker,
+                    {
+                      transform: [
+                        { rotate: `${i * 30}deg` },
+                        { translateY: -35 }
+                      ]
+                    }
+                  ]}
+                />
+              ))}
+              {/* Clock hands */}
+              <View style={[styles.hand, styles.minuteHand]} />
+              <View style={[styles.hand, styles.hourHand]} />
+              <View style={styles.centerDot} />
+            </View>
+            {/* Glowing orange outline */}
+            <View style={styles.glowOutline} />
+          </View>
         </View>
         
         <Text style={styles.welcomeText}>
@@ -91,13 +114,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  illustration: {
-    flexDirection: 'row',
-    marginBottom: 30,
+  logoContainer: {
+    marginBottom: 40,
+    alignItems: 'center',
   },
-  emoji: {
-    fontSize: 60,
-    marginHorizontal: 10,
+  clockLogo: {
+    position: 'relative',
+    width: 120,
+    height: 120,
+  },
+  clockFace: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#1a1a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  hourMarker: {
+    position: 'absolute',
+    width: 2,
+    height: 8,
+    backgroundColor: '#4FC3F7',
+    borderRadius: 1,
+  },
+  hand: {
+    position: 'absolute',
+    backgroundColor: '#4FC3F7',
+    borderRadius: 2,
+  },
+  minuteHand: {
+    width: 2,
+    height: 35,
+    transform: [{ translateY: -17.5 }],
+  },
+  hourHand: {
+    width: 3,
+    height: 25,
+    transform: [{ translateY: -12.5 }, { rotate: '-30deg' }],
+  },
+  centerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4FC3F7',
+  },
+  glowOutline: {
+    position: 'absolute',
+    top: -10,
+    left: -10,
+    right: -10,
+    bottom: -10,
+    borderRadius: 70,
+    borderWidth: 3,
+    borderColor: '#FF9800',
+    shadowColor: '#FF9800',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 10,
   },
   welcomeText: {
     fontSize: 28,

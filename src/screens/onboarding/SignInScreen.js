@@ -24,7 +24,8 @@ export default function SignInScreen({ navigation }) {
     setLoading(true);
     try {
       await UserService.signIn(email, password);
-      // Navigation will be handled by auth state change
+      // Navigate to welcome screen first
+      navigation.replace('WelcomeKiros');
     } catch (error) {
       Alert.alert('Error', error.message);
     } finally {

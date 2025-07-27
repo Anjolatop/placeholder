@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 
-export default function AlarmsScreen() {
+export default function AlarmsScreen({ navigation }) {
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
@@ -11,7 +11,10 @@ export default function AlarmsScreen() {
       </View>
 
       {/* Add Alarm Button */}
-      <TouchableOpacity style={styles.addButton}>
+      <TouchableOpacity 
+        style={styles.addButton}
+        onPress={() => navigation.navigate('AlarmSetup')}
+      >
         <Text style={styles.addButtonText}>+ Add New Alarm</Text>
       </TouchableOpacity>
 

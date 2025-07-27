@@ -1,14 +1,27 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Text, View, StyleSheet } from 'react-native';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
 import AlarmsScreen from '../screens/AlarmsScreen';
+import AlarmSetupScreen from '../screens/AlarmSetupScreen';
 import StatsScreen from '../screens/StatsScreen';
 import VoiceScreen from '../screens/VoiceScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
+
+// Alarms Stack Navigator
+function AlarmsStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AlarmsList" component={AlarmsScreen} />
+      <Stack.Screen name="AlarmSetup" component={AlarmSetupScreen} />
+    </Stack.Navigator>
+  );
+}
 
 // Custom tab bar icon component
 const TabBarIcon = ({ focused, icon, label }) => (
@@ -44,7 +57,7 @@ export default function TabNavigator() {
       />
       <Tab.Screen
         name="Alarms"
-        component={AlarmsScreen}
+        component={AlarmsStack}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabBarIcon focused={focused} icon="⏰" label="Alarms" />

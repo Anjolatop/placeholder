@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, StatusBar, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const { userProfile, signOut } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -89,9 +89,12 @@ export default function HomeScreen() {
       <View style={styles.preferencesCard}>
         <Text style={styles.cardTitle}>🎭 Your Preferences</Text>
         <View style={styles.preferenceItem}>
-          <Text style={styles.preferenceLabel}>Tone:</Text>
+          <Text style={styles.preferenceLabel}>Tones:</Text>
           <Text style={styles.preferenceValue}>
-            {userProfile?.preferredTone?.replace('-', ' ').toUpperCase() || 'Mid-Delicate'}
+            {userProfile?.preferredTones?.length > 0 
+              ? userProfile.preferredTones.map(tone => tone.replace('-', ' ').toUpperCase()).join(', ')
+              : 'Mid-Delicate'
+            }
           </Text>
         </View>
         <View style={styles.preferenceItem}>
@@ -123,10 +126,13 @@ export default function HomeScreen() {
       <View style={styles.actionsCard}>
         <Text style={styles.cardTitle}>Quick Actions</Text>
         <View style={styles.actionButtons}>
-          <View style={styles.actionButton}>
-            <Text style={styles.actionIcon}>⏰</Text>
-            <Text style={styles.actionText}>Set Alarm</Text>
-          </View>
+                                  <TouchableOpacity 
+                          style={styles.actionButton}
+                          onPress={() => navigation.navigate('Alarms', { screen: 'AlarmSetup' })}
+                        >
+                          <Text style={styles.actionIcon}>⏰</Text>
+                          <Text style={styles.actionText}>Set Alarm</Text>
+                        </TouchableOpacity>
           <View style={styles.actionButton}>
             <Text style={styles.actionIcon}>🎵</Text>
             <Text style={styles.actionText}>Voice Test</Text>

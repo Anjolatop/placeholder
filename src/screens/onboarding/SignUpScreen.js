@@ -46,8 +46,8 @@ export default function SignUpScreen({ navigation }) {
       };
 
       await UserService.createUser(email, password, tempUserData);
-      // Navigate to profile setup
-      navigation.navigate('ProfileSetup');
+      // Navigate to welcome screen first
+      navigation.replace('WelcomeKiros');
     } catch (error) {
       Alert.alert('Error', error.message);
     } finally {
